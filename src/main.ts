@@ -14,8 +14,8 @@
 
 import "./style.css";
 
-import { fromEvent, interval, merge } from "rxjs";
-import { map, filter, scan } from "rxjs/operators";
+import { fromEvent, interval, merge, Subscription} from "rxjs";
+import { map, filter, scan, takeUntil } from "rxjs/operators";
 
 /** Constants */
 
@@ -32,10 +32,38 @@ const Constants = {
   GRID_HEIGHT: 20,
 } as const;
 
-const Block = {
-  WIDTH: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-  HEIGHT: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
-};
+// const Block = {
+//   WIDTH: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
+//   HEIGHT: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+// };
+
+/**
+ * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
+ */
+type ObjectId = Readonly<{ id: String }>
+
+interface Block extends ObjectId{
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  placed: boolean,
+  style: String
+}
+
+type Body = Readonly<Block>
+
+// const createBlock = (id: String, x: number = Viewport.CANVAS_WIDTH/2, y: number = 0, placed: boolean = false, onSvg: boolean = false): Body => {
+//   return {
+//     id: id,
+//     x: x,
+//     y: y,
+//     width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
+//     height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+//     placed: placed,
+//     style: "fill: green"
+//   }
+// }
 
 /** User input */
 
@@ -49,10 +77,16 @@ type Event = "keydown" | "keyup" | "keypress";
 
 type State = Readonly<{
   gameEnd: boolean;
+  score: number;
+  blocks: ReadonlyArray<Body>;
+  blockCount: number;
 }>;
 
 const initialState: State = {
   gameEnd: false,
+  score: 0,
+  blocks: [],
+  blockCount: 0
 } as const;
 
 /**
@@ -130,12 +164,18 @@ export function main() {
 
   const key$ = fromEvent<KeyboardEvent>(document, "keypress");
 
-  const fromKey = (keyCode: Key) =>
-    key$.pipe(filter(({ code }) => code === keyCode));
+  const fromKey = (keyCode: Key, x:number) =>
+    key$.pipe(
+      filter(({ code }) => code === keyCode),
+      map(() => ({ 
+        x: x // map this to access "value" in the pipe
+      }))
+      );
+    
 
-  const left$ = fromKey("KeyA");
-  const right$ = fromKey("KeyD");
-  const down$ = fromKey("KeyS");
+  const left$ = fromKey("KeyA", -5);
+  const right$ = fromKey("KeyD", 5);
+  // const down$ = fromKey("KeyS");
 
   /** Observables */
 
@@ -151,53 +191,98 @@ export function main() {
    */
   const render = (s: State) => {
     // Add blocks to the main grid canvas
-    const cube = createSvgElement(svg.namespaceURI, "rect", {
-      height: `${Block.HEIGHT}`,
-      width: `${Block.WIDTH}`,
-      x: "0",
-      y: "0",
-      style: "fill: green",
+    // reset the svg before adding any element
+    svg.innerHTML = '';
+    s.blocks.forEach(block => {
+      //render each block based on its props
+      const cube = createSvgElement(svg.namespaceURI, "rect");
+      Object.entries(block).forEach(([key, val]) => 
+        cube.setAttribute(key, String(val))
+      );
+      svg.appendChild(cube);
+      // console.log(cube);
     });
-    svg.appendChild(cube);
-    const cube2 = createSvgElement(svg.namespaceURI, "rect", {
-      height: `${Block.HEIGHT}`,
-      width: `${Block.WIDTH}`,
-      x: `${Block.WIDTH * (3 - 1)}`,
-      y: `${Block.HEIGHT * (20 - 1)}`,
-      style: "fill: red",
-    });
-    svg.appendChild(cube2);
-    const cube3 = createSvgElement(svg.namespaceURI, "rect", {
-      height: `${Block.HEIGHT}`,
-      width: `${Block.WIDTH}`,
-      x: `${Block.WIDTH * (4 - 1)}`,
-      y: `${Block.HEIGHT * (20 - 1)}`,
-      style: "fill: red",
-    });
-    svg.appendChild(cube3);
+    }
 
-    // Add a block to the preview canvas
-    const cubePreview = createSvgElement(preview.namespaceURI, "rect", {
-      height: `${Block.HEIGHT}`,
-      width: `${Block.WIDTH}`,
-      x: `${Block.WIDTH * 2}`,
-      y: `${Block.HEIGHT}`,
-      style: "fill: green",
-    });
-    preview.appendChild(cubePreview);
-  };
+  //in order to merge tick with the input keyboard stream, we need to map the same properties as the input keybord stream
+  const tickWithX$ = tick$.pipe(
+    map(() => ({ x: 0}))
+  );
 
-  const source$ = merge(tick$)
-    .pipe(scan((s: State) => ({ gameEnd: true }), initialState))
-    .subscribe((s: State) => {
-      render(s);
+  const touchBoundaryOrBlock = (block: Block): boolean => {
+    if(!block){ // null-error handling
+      return false
+    }
+    //if the block touch the boundary
+    return block.y >= Viewport.CANVAS_HEIGHT - block.height ?  true : false
+  }
 
+  const source$ = merge(tickWithX$,left$,right$).pipe(
+      scan((s:State,value) => { // the value is the value emitted from the stream mainly used when the left$ and right$ is pressed
+        // we get the current greenBlock of the current game state, and we check if it has touched the boundary or not
+        // if it didnt touch the boundary, we modify the y-coor of the block with a fixed value, and x-coor depending on the input keyboard pressed times, then copy all the data to assign to the state,
+        // and ready for the next interval
+        // if it touched the boundary, we changed the the block colour to red, means that the game need to create a new block
+        // if current game state does not have green block, we need to create one for it as well
+        const greenBlock = s.blocks.filter(block => !block.placed)[0]
+        const isTouched = touchBoundaryOrBlock(greenBlock)
+        if(isTouched && greenBlock){
+          const block: Block = {
+            ...greenBlock,
+            placed: true,
+            style: "fill: red"
+          }
+          const afterFiltering = s.blocks.filter(block => block.placed)
+          const newState: State = {
+            ... s,
+            blocks: [...afterFiltering, block],
+          }
+          s = newState
+          console.log("touched")
+        }
+        if(isTouched || !greenBlock){
+          const block: Block = {
+            id: `${s.blockCount}`,
+            x: Viewport.CANVAS_WIDTH/2,
+            y: 0,
+            width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
+            height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+            placed: false,
+            style: "fill: green"
+          }
+          const newState: State = {
+            ... s,
+            blocks: [...s.blocks, block],
+            blockCount: s.blockCount + 1
+          }
+          s = newState
+      }
+      else{
+        const altGreenBlock: Block = {
+          ...greenBlock,
+          x: greenBlock.x + value.x,
+          // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
+          // if yes, use the canvas.weight - the block's width as its y-coor
+          y: greenBlock.y+50 - (Viewport.CANVAS_HEIGHT - greenBlock.height) < 0 ?  greenBlock.y+50 : Viewport.CANVAS_HEIGHT - greenBlock.height
+        }
+        const afterFiltering = s.blocks.filter(block => block.placed)
+        const newState: State = {
+          ...s,
+          blocks: [...afterFiltering,altGreenBlock],
+        }
+        s = newState
+      }
+        return s
+      },initialState)
+    ).subscribe((s:State) => {
+      render(s)
       if (s.gameEnd) {
         show(gameover);
       } else {
         hide(gameover);
       }
-    });
+    }
+    );
 }
 
 // The following simply runs your main function on window load.  Make sure to leave it in place.
