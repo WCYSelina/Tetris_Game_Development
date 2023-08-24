@@ -204,28 +204,22 @@ export function main() {
     else{
       const newBlocks = s.blocks.map(eBlock => {
         if(eBlock.id !== block.id){ // we do not want to check the same block in the array
-          console.log(`${eBlock.id} ${block.id}`)
-          console.log(eBlock.id !== block.id)
           const eBlockXEnd = eBlock.x - eBlock.width
           const eBlockYIn = eBlock.y - eBlock.height
           const blockXEnd = block.x - block.width
-          const blockYEnd = block.y - block.height
           //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
           if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
             if(block.y >= eBlockYIn){
-              console.log(eBlockYIn)
               return eBlockYIn
             }
           }
           if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd < eBlock.x && blockXEnd > eBlockXEnd){
             if(block.y >= eBlockYIn){
-              console.log("ppp")
               return eBlockYIn
             }
           }
           //if the block touches the boundary
           if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-            console.log("999")
             return Viewport.CANVAS_HEIGHT - block.height
           }
           else{
@@ -238,9 +232,49 @@ export function main() {
     return null
   }
 
-  const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number) => {
-    if(minY && minY >= Viewport.CANVAS_HEIGHT - greenBlock.height && greenBlock){
-      console.log("new")
+  const touchedBoolean = (block: Block, s: State, dist: number = 0): boolean | (boolean|undefined)[] => {
+    if(!block){ // null-error handling
+      return false
+    }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
+    if(s.blockCount == 1) {
+      //if the block touches the boundary
+      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
+        return true
+      }
+    }
+    else{
+      const newBlocks = s.blocks.map(eBlock => {
+        if(eBlock.id !== block.id){ // we do not want to check the same block in the array
+          const eBlockXEnd = eBlock.x - eBlock.width
+          const eBlockYIn = eBlock.y - eBlock.height
+          const blockXEnd = block.x - block.width
+          //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
+          if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
+            if(block.y >= eBlockYIn){
+              return true
+            }
+          }
+          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd < eBlock.x && blockXEnd > eBlockXEnd){
+            if(block.y >= eBlockYIn){
+              return true
+            }
+          }
+          //if the block touches the boundary
+          if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
+            return true
+          }
+          else{
+            return false
+          }
+        }
+      })
+      return newBlocks
+    }
+    return false
+  }
+
+  const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number, touched: boolean) => {
+    if(minY && touched && greenBlock){
       const block: Block = {
         ...greenBlock,
         placed: true,
@@ -335,15 +369,29 @@ export function main() {
         if(Array.isArray(isTouched)){
           const minY = isTouched.reduce((min,current) => {
             return current! < min! ? current : min},Infinity)
-          console.log(minY)
-          s = afterTouched(s,minY!,greenBlock,value.x)
+            const touched = touchedBoolean(greenBlock,s)
+            if(Array.isArray(touched)){
+              const ifTouched = touched.reduce((touched,current) => {return current ? current : touched },false)
+              s = afterTouched(s,minY!,greenBlock,value.x,ifTouched!)
+            }
+            else{
+              const ifTouched = touched
+              s = afterTouched(s,minY!,greenBlock,value.x,ifTouched)
+            }
+          
         }
         else{
           const minY = isTouched
-          console.log(minY)
-          s = afterTouched(s,minY,greenBlock,value.x)
+          const touched = touchedBoolean(greenBlock,s)
+          if(Array.isArray(touched)){
+            const ifTouched = touched.reduce((touched,current) => {return current ? current : touched },false)
+            s = afterTouched(s,minY!,greenBlock,value.x,ifTouched!)
+          }
+          else{
+            const ifTouched = touched
+            s = afterTouched(s,minY!,greenBlock,value.x,ifTouched)
+          }
         }  
-        console.log(s)
         return s
       },initialState)
     ).subscribe((s:State) => {
