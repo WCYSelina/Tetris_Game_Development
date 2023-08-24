@@ -27,15 +27,10 @@ const Viewport = {
 } as const;
 
 const Constants = {
-  TICK_RATE_MS: 500,
+  TICK_RATE_MS: 750,//500
   GRID_WIDTH: 10,
   GRID_HEIGHT: 20,
 } as const;
-
-// const Block = {
-//   WIDTH: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-//   HEIGHT: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
-// };
 
 /**
  * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
@@ -52,19 +47,6 @@ interface Block extends ObjectId{
 }
 
 type Body = Readonly<Block>
-
-// const createBlock = (id: String, x: number = Viewport.CANVAS_WIDTH/2, y: number = 0, placed: boolean = false, onSvg: boolean = false): Body => {
-//   return {
-//     id: id,
-//     x: x,
-//     y: y,
-//     width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-//     height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
-//     placed: placed,
-//     style: "fill: green"
-//   }
-// }
-
 /** User input */
 
 type Key = "KeyS" | "KeyA" | "KeyD";
@@ -200,7 +182,6 @@ export function main() {
         cube.setAttribute(key, String(val))
       );
       svg.appendChild(cube);
-      // console.log(cube);
     });
     }
 
@@ -209,12 +190,135 @@ export function main() {
     map(() => ({ x: 0}))
   );
 
-  const touchBoundaryOrBlock = (block: Block): boolean => {
+  const touchBoundaryOrBlock = (block: Block, s: State, dist: number = 0): (number|undefined)[] | null | number => {
     if(!block){ // null-error handling
-      return false
+      return null
+    }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
+    if(s.blockCount == 1) {
+      //if the block touches the boundary
+      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
+        console.log("888")
+        return Viewport.CANVAS_HEIGHT - block.height
+      }
     }
-    //if the block touch the boundary
-    return block.y >= Viewport.CANVAS_HEIGHT - block.height ?  true : false
+    else{
+      const newBlocks = s.blocks.map(eBlock => {
+        if(eBlock.id !== block.id){ // we do not want to check the same block in the array
+          console.log(`${eBlock.id} ${block.id}`)
+          console.log(eBlock.id !== block.id)
+          const eBlockXEnd = eBlock.x - eBlock.width
+          const eBlockYIn = eBlock.y - eBlock.height
+          const blockXEnd = block.x - block.width
+          const blockYEnd = block.y - block.height
+          //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
+          if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
+            if(block.y >= eBlockYIn){
+              console.log(eBlockYIn)
+              return eBlockYIn
+            }
+          }
+          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd < eBlock.x && blockXEnd > eBlockXEnd){
+            if(block.y >= eBlockYIn){
+              console.log("ppp")
+              return eBlockYIn
+            }
+          }
+          //if the block touches the boundary
+          if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
+            console.log("999")
+            return Viewport.CANVAS_HEIGHT - block.height
+          }
+          else{
+            return block.y
+          }
+        }
+      })
+      return newBlocks
+    }
+    return null
+  }
+
+  const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number) => {
+    if(minY && minY >= Viewport.CANVAS_HEIGHT - greenBlock.height && greenBlock){
+      console.log("new")
+      const block: Block = {
+        ...greenBlock,
+        placed: true,
+        style: "fill: red"
+      }
+      const afterFiltering = s.blocks.filter(block => block.placed)
+      const newState: State = {
+        ... s,
+        blocks: [...afterFiltering, block],
+      }
+      s = newState
+    }
+    const newGreenBlock = s.blocks.filter(block => !block.placed)[0]
+    console.log("green")
+    console.log(newGreenBlock)
+    if(!newGreenBlock){
+      console.log("create")
+      const block: Block = {
+        id: `${s.blockCount}`,
+        x: Viewport.CANVAS_WIDTH/2,
+        y: 0,
+        width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
+        height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+        placed: false,
+        style: "fill: green"
+      }
+      const newState: State = {
+        ... s,
+        blocks: [...s.blocks, block],
+        blockCount: s.blockCount + 1
+      }
+      s = newState
+    }
+    else{
+      console.log("sss")
+      const altGreenBlock: Block = {
+        ...greenBlock,
+        x: greenBlock.x + x,
+        // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
+        // if yes, use the canvas.weight - the block's width as its y-coor
+        y: greenBlock.y + 50
+      }
+      const newY = touchBoundaryOrBlock(altGreenBlock,s)
+      const afterFiltering = s.blocks.filter(block => block.placed)
+      if(Array.isArray(newY)){
+        const minY = newY.reduce((min,current) => {
+          return current! < min! ? current : min},Infinity)
+          const newBlock: Block = {
+            ...altGreenBlock,
+            y: minY!
+          }
+          const newState: State = {
+            ...s,
+            blocks: [...afterFiltering,newBlock],
+          }
+          s = newState
+      }
+      else if(typeof newY === "number"){
+
+        const newBlock: Block = {
+          ...altGreenBlock,
+          y: newY
+        }
+        const newState: State = {
+          ...s,
+          blocks: [...afterFiltering,newBlock],
+        }
+        s = newState
+      }
+      else{
+        const newState: State = {
+          ...s,
+          blocks: [...afterFiltering,altGreenBlock],
+        }
+        s = newState
+      }
+    }
+    return s
   }
 
   const source$ = merge(tickWithX$,left$,right$).pipe(
@@ -225,53 +329,21 @@ export function main() {
         // if it touched the boundary, we changed the the block colour to red, means that the game need to create a new block
         // if current game state does not have green block, we need to create one for it as well
         const greenBlock = s.blocks.filter(block => !block.placed)[0]
-        const isTouched = touchBoundaryOrBlock(greenBlock)
-        if(isTouched && greenBlock){
-          const block: Block = {
-            ...greenBlock,
-            placed: true,
-            style: "fill: red"
-          }
-          const afterFiltering = s.blocks.filter(block => block.placed)
-          const newState: State = {
-            ... s,
-            blocks: [...afterFiltering, block],
-          }
-          s = newState
-          console.log("touched")
+        const isTouched = touchBoundaryOrBlock(greenBlock,s)
+        console.log(isTouched)
+        console.log(greenBlock)
+        if(Array.isArray(isTouched)){
+          const minY = isTouched.reduce((min,current) => {
+            return current! < min! ? current : min},Infinity)
+          console.log(minY)
+          s = afterTouched(s,minY!,greenBlock,value.x)
         }
-        if(isTouched || !greenBlock){
-          const block: Block = {
-            id: `${s.blockCount}`,
-            x: Viewport.CANVAS_WIDTH/2,
-            y: 0,
-            width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-            height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
-            placed: false,
-            style: "fill: green"
-          }
-          const newState: State = {
-            ... s,
-            blocks: [...s.blocks, block],
-            blockCount: s.blockCount + 1
-          }
-          s = newState
-      }
-      else{
-        const altGreenBlock: Block = {
-          ...greenBlock,
-          x: greenBlock.x + value.x,
-          // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
-          // if yes, use the canvas.weight - the block's width as its y-coor
-          y: greenBlock.y+50 - (Viewport.CANVAS_HEIGHT - greenBlock.height) < 0 ?  greenBlock.y+50 : Viewport.CANVAS_HEIGHT - greenBlock.height
-        }
-        const afterFiltering = s.blocks.filter(block => block.placed)
-        const newState: State = {
-          ...s,
-          blocks: [...afterFiltering,altGreenBlock],
-        }
-        s = newState
-      }
+        else{
+          const minY = isTouched
+          console.log(minY)
+          s = afterTouched(s,minY,greenBlock,value.x)
+        }  
+        console.log(s)
         return s
       },initialState)
     ).subscribe((s:State) => {
