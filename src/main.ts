@@ -189,7 +189,6 @@ export function main() {
   const tickWithX$ = tick$.pipe(
     map(() => ({ x: 0}))
   );
-
   const touchBoundaryOrBlock = (block: Block, s: State, dist: number = 0): (number|undefined)[] | null | number => {
     if(!block){ // null-error handling
       return null
@@ -197,28 +196,28 @@ export function main() {
     if(s.blockCount == 1) {
       //if the block touches the boundary
       if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-        console.log("888")
         return Viewport.CANVAS_HEIGHT - block.height
       }
     }
     else{
       const newBlocks = s.blocks.map(eBlock => {
         if(eBlock.id !== block.id){ // we do not want to check the same block in the array
-          const eBlockXEnd = eBlock.x - eBlock.width
+          const eBlockXEnd = eBlock.x + eBlock.width
           const eBlockYIn = eBlock.y - eBlock.height
-          const blockXEnd = block.x - block.width
-          //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
+          const blockXEnd = block.x + block.width
+          //if the x-coor of blocak is within the range of eBlock.x(initial) and eBlockXEnd
           if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
             if(block.y >= eBlockYIn){
               return eBlockYIn
             }
           }
-          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd < eBlock.x && blockXEnd > eBlockXEnd){
+          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd){
             if(block.y >= eBlockYIn){
+              console.log(block.x > eBlock.x && block.x < eBlockXEnd)
               return eBlockYIn
             }
           }
-          //if the block touches the boundary
+          //if the block touches the boundaryaaa
           if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
             return Viewport.CANVAS_HEIGHT - block.height
           }
@@ -245,16 +244,16 @@ export function main() {
     else{
       const newBlocks = s.blocks.map(eBlock => {
         if(eBlock.id !== block.id){ // we do not want to check the same block in the array
-          const eBlockXEnd = eBlock.x - eBlock.width
+          const eBlockXEnd = eBlock.x + eBlock.width
           const eBlockYIn = eBlock.y - eBlock.height
-          const blockXEnd = block.x - block.width
+          const blockXEnd = block.x + block.width
           //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
           if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
             if(block.y >= eBlockYIn){
               return true
             }
           }
-          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd < eBlock.x && blockXEnd > eBlockXEnd){
+          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd){
             if(block.y >= eBlockYIn){
               return true
             }
@@ -288,10 +287,7 @@ export function main() {
       s = newState
     }
     const newGreenBlock = s.blocks.filter(block => !block.placed)[0]
-    console.log("green")
-    console.log(newGreenBlock)
     if(!newGreenBlock){
-      console.log("create")
       const block: Block = {
         id: `${s.blockCount}`,
         x: Viewport.CANVAS_WIDTH/2,
@@ -309,7 +305,7 @@ export function main() {
       s = newState
     }
     else{
-      console.log("sss")
+
       const altGreenBlock: Block = {
         ...greenBlock,
         x: greenBlock.x + x,
@@ -364,8 +360,6 @@ export function main() {
         // if current game state does not have green block, we need to create one for it as well
         const greenBlock = s.blocks.filter(block => !block.placed)[0]
         const isTouched = touchBoundaryOrBlock(greenBlock,s)
-        console.log(isTouched)
-        console.log(greenBlock)
         if(Array.isArray(isTouched)){
           const minY = isTouched.reduce((min,current) => {
             return current! < min! ? current : min},Infinity)
