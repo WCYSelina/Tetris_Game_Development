@@ -142,15 +142,21 @@ export function main() {
   const tickWithX$ = tick$.pipe(
     map(() => ({ x: 0}))
   );
-  const touchBoundaryOrBlock = (block: Block, s: State, dist: number = 0): (number|undefined)[] | null | number => {
+  const touchBoundaryOrBlock = (block: Block, s: State): {y: number, isTouched: boolean} => {
+    const ERRORYANDISTOUCHED = {y: Infinity, isTouched: true}
+    
+    const reachBoundary = () => {
+      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
+        return {y: Viewport.CANVAS_HEIGHT - block.height, isTouched: true}
+      }
+    }
     if(!block){ // null-error handling
-      return null
+      return ERRORYANDISTOUCHED
     }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
     if(s.blockCount == 1) {
       //if the block touches the boundary
-      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-        return Viewport.CANVAS_HEIGHT - block.height
-      }
+      const returnValue = reachBoundary()
+      if(returnValue) return returnValue
     }
     else{
       const newBlocks = s.blocks.map(eBlock => {
@@ -159,73 +165,40 @@ export function main() {
           const eBlockYIn = eBlock.y - eBlock.height
           const blockXEnd = block.x + block.width
           //if the x-coor of blocak is within the range of eBlock.x(initial) and eBlockXEnd
-          if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
+          const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
+          const ifnewXOverlap = block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd
+          if(bothSameX || ifnewXOverlap) {
             if(block.y >= eBlockYIn){
-              return eBlockYIn
-            }
-          }
-          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd){
-            if(block.y >= eBlockYIn){
-              return eBlockYIn
-            }
-          }
-          //if the block touches the boundaryaaa
-          if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-            return Viewport.CANVAS_HEIGHT - block.height
-          }
-          else{
-            return block.y
-          }
-        }
-      })
-      return newBlocks
-    }
-    return null
-  }
-
-  const touchedBoolean = (block: Block, s: State, dist: number = 0): boolean | (boolean|undefined)[] => {
-    if(!block){ // null-error handling
-      return false
-    }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
-    if(s.blockCount == 1) {
-      //if the block touches the boundary
-      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-        return true
-      }
-    }
-    else{
-      const newBlocks = s.blocks.map(eBlock => {
-        if(eBlock.id !== block.id){ // we do not want to check the same block in the array
-          const eBlockXEnd = eBlock.x + eBlock.width
-          const eBlockYIn = eBlock.y - eBlock.height
-          const blockXEnd = block.x + block.width
-          //if the x-coor of block is within the range of eBlock.x(initial) and eBlockXEnd
-          if(block.x === eBlock.x && blockXEnd === eBlockXEnd) {
-            if(block.y >= eBlockYIn){
-              return true
-            }
-          }
-          if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd){
-            if(block.y >= eBlockYIn){
-              return true
+              return {y: eBlockYIn, isTouched: true}
             }
           }
           //if the block touches the boundary
-          if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-            return true
-          }
+          const returnValue = reachBoundary()
+          if(returnValue) return returnValue
           else{
-            return false
+            return {y: block.y, isTouched: false}
           }
         }
+        else{
+          return ERRORYANDISTOUCHED //handle the situation where it does not match any situations
+        }
       })
-      return newBlocks
+      //the newBlocks contains the informations of the current block whether touches boundary or any other blocks or neither of them
+      // get the min Y-coor
+      const minY = newBlocks.reduce((min,current) => {
+        if(current.isTouched && current!.y < min.y){
+          return {y: current.y, isTouched: true}
+        }
+        else{
+          return {y: min.y, isTouched: min.isTouched}
+        }
+      }, ERRORYANDISTOUCHED) 
+      return minY
     }
-    return false
+    return ERRORYANDISTOUCHED //handle the situation where it does not match any situations
   }
-
   const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number, touched: boolean) => {
-    if(minY && touched && greenBlock){
+    if(minY != Infinity && touched && greenBlock){
       const block = createBlock(greenBlock,{placed: true, style: "fill: red"})
       const afterFiltering = s.blocks.filter(block => block.placed)
       s = createState(s,{blocks: [...afterFiltering,block]})
@@ -249,14 +222,8 @@ export function main() {
       const altGreenBlock = createBlock(greenBlock, {x: greenBlock.x + x, y: greenBlock.y + 50})
       const newY = touchBoundaryOrBlock(altGreenBlock,s)
       const afterFiltering = s.blocks.filter(block => block.placed)
-      if(Array.isArray(newY)){
-        const minY = newY.reduce((min,current) => {
-          return current! < min! ? current : min},Infinity)
-          const newBlock = createBlock(altGreenBlock,{y:minY!})
-          s = createState(s,{blocks: [...afterFiltering,newBlock]})
-      }
-      else if(typeof newY === "number"){
-        const newBlock = createBlock(altGreenBlock,{y:newY})
+      if(newY.y != Infinity){
+        const newBlock = createBlock(altGreenBlock,{y:newY.y})
         s = createState(s,{blocks: [...afterFiltering,newBlock]})
       }
       else{
@@ -289,32 +256,7 @@ export function main() {
         // if current game state does not have green block, we need to create one for it as well
         const greenBlock = s.blocks.filter(block => !block.placed)[0]
         const isTouched = touchBoundaryOrBlock(greenBlock,s)
-        if(Array.isArray(isTouched)){
-          const minY = isTouched.reduce((min,current) => {
-            return current! < min! ? current : min},Infinity)
-            const touched = touchedBoolean(greenBlock,s)
-            if(Array.isArray(touched)){
-              const ifTouched = touched.reduce((touched,current) => {return current ? current : touched },false)
-              s = afterTouched(s,minY!,greenBlock,value.x,ifTouched!)
-            }
-            else{
-              const ifTouched = touched
-              s = afterTouched(s,minY!,greenBlock,value.x,ifTouched)
-            }
-          
-        }
-        else{
-          const minY = isTouched
-          const touched = touchedBoolean(greenBlock,s)
-          if(Array.isArray(touched)){
-            const ifTouched = touched.reduce((touched,current) => {return current ? current : touched },false)
-            s = afterTouched(s,minY!,greenBlock,value.x,ifTouched!)
-          }
-          else{
-            const ifTouched = touched
-            s = afterTouched(s,minY!,greenBlock,value.x,ifTouched)
-          }
-        }  
+        s = afterTouched(s,isTouched.y,greenBlock,value.x,isTouched.isTouched)
         return s
       },initialState)
     ).subscribe((s:State) => {
