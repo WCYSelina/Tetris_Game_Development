@@ -136,19 +136,19 @@ export function main() {
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
   const touchBoundaryOrBlock = (block: Block, s: State): {y: number, isTouched: boolean} => {
-    const ERRORYANDISTOUCHED = {y: Infinity, isTouched: true}
-
-    const reachBoundary = () => {
-      if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
-        return {y: Viewport.CANVAS_HEIGHT - block.height, isTouched: true}
+    const ERROR_Y_AND_ISTOUCHED = {y: Infinity, isTouched: true}
+    const reachBoundaryY = () => {
+      const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
+      if(block.y >= BOTTOM_BOUNDARY){
+        return {y: BOTTOM_BOUNDARY, isTouched: true}
       }
     }
     if(!block){ // null-error handling
-      return ERRORYANDISTOUCHED
+      return ERROR_Y_AND_ISTOUCHED
     }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
     if(s.blockCount == 1) {
       //if the block touches the boundary
-      const returnValue = reachBoundary()
+      const returnValue = reachBoundaryY()
       if(returnValue) return returnValue
     }
     else{
@@ -166,14 +166,14 @@ export function main() {
             }
           }
           //if the block touches the boundary
-          const returnValue = reachBoundary()
+          const returnValue = reachBoundaryY()
           if(returnValue) return returnValue
           else{
             return {y: block.y, isTouched: false}
           }
         }
         else{
-          return ERRORYANDISTOUCHED //handle the situation where it does not match any situations
+          return ERROR_Y_AND_ISTOUCHED //handle the situation where it does not match any situations
         }
       })
       //the newBlocks contains the informations of the current block whether touches boundary or any other blocks or neither of them
@@ -185,10 +185,10 @@ export function main() {
         else{
           return {y: min.y, isTouched: min.isTouched}
         }
-      }, ERRORYANDISTOUCHED) 
+      }, ERROR_Y_AND_ISTOUCHED) 
       return minY
     }
-    return ERRORYANDISTOUCHED //handle the situation where it does not match any situations
+    return ERROR_Y_AND_ISTOUCHED //handle the situation where it does not match any situations
   }
   const afterTouched = (s:State, minY: number | null, greenBlock: Block, operator: KeyPressValue, touched: boolean) => {
     if(minY != Infinity && touched && greenBlock){
@@ -212,16 +212,20 @@ export function main() {
     else{
       // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
       // if yes, use the canvas.weight - the block's width as its y-coor
-      
+      const LEFT_BOUNDARY = 0
+      const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - greenBlock.width
       const findX = (operator:string | null) => {
           if(operator === "+X"){
-            return greenBlock.x + greenBlock.width
+            const x = greenBlock.x + greenBlock.width
+            return  x <= RIGHT_BOUNDARY ? x : RIGHT_BOUNDARY
           }
           else{
-            return greenBlock.x - greenBlock.width
+            const x = greenBlock.x - greenBlock.width
+            return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
           }
       }
       const x = operator === "+X" || operator === "-X" ? findX(operator) : greenBlock.x
+      console.log(x)
       const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
       const altGreenBlock = createBlock(greenBlock, {x: x, y: greenBlock.y + 25 + y})
       const newY = touchBoundaryOrBlock(altGreenBlock,s)
