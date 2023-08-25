@@ -13,56 +13,9 @@
  */
 
 import "./style.css";
-
 import { fromEvent, interval, merge, Subscription} from "rxjs";
 import { map, filter, scan, takeUntil } from "rxjs/operators";
-
-/** Constants */
-
-const Viewport = {
-  CANVAS_WIDTH: 200,
-  CANVAS_HEIGHT: 400,
-  PREVIEW_WIDTH: 160,
-  PREVIEW_HEIGHT: 80,
-} as const;
-
-const Constants = {
-  TICK_RATE_MS: 750,//500
-  GRID_WIDTH: 10,
-  GRID_HEIGHT: 20,
-} as const;
-
-/**
- * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
- */
-type ObjectId = Readonly<{ id: String }>
-
-interface Block extends ObjectId{
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  placed: boolean,
-  style: String
-}
-
-type Body = Readonly<Block>
-/** User input */
-
-type Key = "KeyS" | "KeyA" | "KeyD";
-
-type Event = "keydown" | "keyup" | "keypress";
-
-/** Utility functions */
-
-/** State processing */
-
-type State = Readonly<{
-  gameEnd: boolean;
-  score: number;
-  blocks: ReadonlyArray<Body>;
-  blockCount: number;
-}>;
+import { Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants} from './types'
 
 const initialState: State = {
   gameEnd: false,
@@ -213,7 +166,6 @@ export function main() {
           }
           if(block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd){
             if(block.y >= eBlockYIn){
-              console.log(block.x > eBlock.x && block.x < eBlockXEnd)
               return eBlockYIn
             }
           }
@@ -274,17 +226,9 @@ export function main() {
 
   const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number, touched: boolean) => {
     if(minY && touched && greenBlock){
-      const block: Block = {
-        ...greenBlock,
-        placed: true,
-        style: "fill: red"
-      }
+      const block = createBlock(greenBlock,{placed: true, style: "fill: red"})
       const afterFiltering = s.blocks.filter(block => block.placed)
-      const newState: State = {
-        ... s,
-        blocks: [...afterFiltering, block],
-      }
-      s = newState
+      s = createState(s,{blocks: [...afterFiltering,block]})
     }
     const newGreenBlock = s.blocks.filter(block => !block.placed)[0]
     if(!newGreenBlock){
@@ -297,58 +241,43 @@ export function main() {
         placed: false,
         style: "fill: green"
       }
-      const newState: State = {
-        ... s,
-        blocks: [...s.blocks, block],
-        blockCount: s.blockCount + 1
-      }
-      s = newState
+      s = createState(s,{blocks: [...s.blocks,block], blockCount: s.blockCount + 1})
     }
     else{
-
-      const altGreenBlock: Block = {
-        ...greenBlock,
-        x: greenBlock.x + x,
-        // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
-        // if yes, use the canvas.weight - the block's width as its y-coor
-        y: greenBlock.y + 50
-      }
+      // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
+      // if yes, use the canvas.weight - the block's width as its y-coor
+      const altGreenBlock = createBlock(greenBlock, {x: greenBlock.x + x, y: greenBlock.y + 50})
       const newY = touchBoundaryOrBlock(altGreenBlock,s)
       const afterFiltering = s.blocks.filter(block => block.placed)
       if(Array.isArray(newY)){
         const minY = newY.reduce((min,current) => {
           return current! < min! ? current : min},Infinity)
-          const newBlock: Block = {
-            ...altGreenBlock,
-            y: minY!
-          }
-          const newState: State = {
-            ...s,
-            blocks: [...afterFiltering,newBlock],
-          }
-          s = newState
+          const newBlock = createBlock(altGreenBlock,{y:minY!})
+          s = createState(s,{blocks: [...afterFiltering,newBlock]})
       }
       else if(typeof newY === "number"){
-
-        const newBlock: Block = {
-          ...altGreenBlock,
-          y: newY
-        }
-        const newState: State = {
-          ...s,
-          blocks: [...afterFiltering,newBlock],
-        }
-        s = newState
+        const newBlock = createBlock(altGreenBlock,{y:newY})
+        s = createState(s,{blocks: [...afterFiltering,newBlock]})
       }
       else{
-        const newState: State = {
-          ...s,
-          blocks: [...afterFiltering,altGreenBlock],
-        }
-        s = newState
+        s = createState(s,{blocks: [...afterFiltering,altGreenBlock]})
       }
     }
     return s
+  }
+
+  const createState = <T extends StateProperty> (s:State, k: KArgumentState<T>): State => {
+    // forEach does not work in here, since k can be many types
+    // Hence, we need Object.keys to iterate the properties of k
+    return Object.keys(k).reduce((newState,key) => {
+      return {...newState, [key]: k[key]} 
+    },{...s})
+  }
+
+  const createBlock = <T extends BlockProperty> (block: Block, k: KArgumentBlock<T>): Block =>{
+    return Object.keys(k).reduce((newBlock,key) => {
+      return {...newBlock, [key]: k[key]} 
+    },{...block})
   }
 
   const source$ = merge(tickWithX$,left$,right$).pipe(
