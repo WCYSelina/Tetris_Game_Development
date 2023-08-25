@@ -1,5 +1,5 @@
 export { Constants, Viewport}
-export type { ObjectId, Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty}
+export type { ObjectId, Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue}
 /** Constants */
 const Viewport = {
   CANVAS_WIDTH: 200,
@@ -9,9 +9,10 @@ const Viewport = {
 } as const;
 
 const Constants = {
-  TICK_RATE_MS: 750,//500
+  TICK_RATE_MS: 500,//500
   GRID_WIDTH: 10,
   GRID_HEIGHT: 20,
+  DOWN_SPEED: 10
 } as const;
 
 /**
@@ -59,3 +60,5 @@ type BlockPropertyValue<T extends BlockProperty> = Block[T]
 type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
+
+type KeyPressValue = "+X" | "-X" | "+Y" | "NULL"

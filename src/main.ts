@@ -15,15 +15,8 @@
 import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
 import { map, filter, scan, takeUntil } from "rxjs/operators";
-import { Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants} from './types'
-
-const initialState: State = {
-  gameEnd: false,
-  score: 0,
-  blocks: [],
-  blockCount: 0
-} as const;
-
+import { Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, KeyPressValue} from './types'
+import { initialState, createState, createBlock } from './state'
 /**
  * Updates the state by proceeding with one time step.
  *
@@ -99,7 +92,7 @@ export function main() {
 
   const key$ = fromEvent<KeyboardEvent>(document, "keypress");
 
-  const fromKey = (keyCode: Key, x:number) =>
+  const fromKey = (keyCode: Key, x: KeyPressValue) =>
     key$.pipe(
       filter(({ code }) => code === keyCode),
       map(() => ({ 
@@ -107,10 +100,10 @@ export function main() {
       }))
       );
     
-
-  const left$ = fromKey("KeyA", -5);
-  const right$ = fromKey("KeyD", 5);
-  // const down$ = fromKey("KeyS");
+    
+  const left$ = fromKey("KeyA", "-X");
+  const right$ = fromKey("KeyD", "+X");
+  const down$ = fromKey("KeyS", "+Y" );
 
   /** Observables */
 
@@ -140,11 +133,11 @@ export function main() {
 
   //in order to merge tick with the input keyboard stream, we need to map the same properties as the input keybord stream
   const tickWithX$ = tick$.pipe(
-    map(() => ({ x: 0}))
+    map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
   const touchBoundaryOrBlock = (block: Block, s: State): {y: number, isTouched: boolean} => {
     const ERRORYANDISTOUCHED = {y: Infinity, isTouched: true}
-    
+
     const reachBoundary = () => {
       if(block.y >= Viewport.CANVAS_HEIGHT - block.height){
         return {y: Viewport.CANVAS_HEIGHT - block.height, isTouched: true}
@@ -197,7 +190,7 @@ export function main() {
     }
     return ERRORYANDISTOUCHED //handle the situation where it does not match any situations
   }
-  const afterTouched = (s:State, minY: number | null, greenBlock: Block, x: number, touched: boolean) => {
+  const afterTouched = (s:State, minY: number | null, greenBlock: Block, operator: KeyPressValue, touched: boolean) => {
     if(minY != Infinity && touched && greenBlock){
       const block = createBlock(greenBlock,{placed: true, style: "fill: red"})
       const afterFiltering = s.blocks.filter(block => block.placed)
@@ -219,7 +212,18 @@ export function main() {
     else{
       // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
       // if yes, use the canvas.weight - the block's width as its y-coor
-      const altGreenBlock = createBlock(greenBlock, {x: greenBlock.x + x, y: greenBlock.y + 50})
+      
+      const findX = (operator:string | null) => {
+          if(operator === "+X"){
+            return greenBlock.x + greenBlock.width
+          }
+          else{
+            return greenBlock.x - greenBlock.width
+          }
+      }
+      const x = operator === "+X" || operator === "-X" ? findX(operator) : greenBlock.x
+      const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
+      const altGreenBlock = createBlock(greenBlock, {x: x, y: greenBlock.y + 25 + y})
       const newY = touchBoundaryOrBlock(altGreenBlock,s)
       const afterFiltering = s.blocks.filter(block => block.placed)
       if(newY.y != Infinity){
@@ -233,21 +237,7 @@ export function main() {
     return s
   }
 
-  const createState = <T extends StateProperty> (s:State, k: KArgumentState<T>): State => {
-    // forEach does not work in here, since k can be many types
-    // Hence, we need Object.keys to iterate the properties of k
-    return Object.keys(k).reduce((newState,key) => {
-      return {...newState, [key]: k[key]} 
-    },{...s})
-  }
-
-  const createBlock = <T extends BlockProperty> (block: Block, k: KArgumentBlock<T>): Block =>{
-    return Object.keys(k).reduce((newBlock,key) => {
-      return {...newBlock, [key]: k[key]} 
-    },{...block})
-  }
-
-  const source$ = merge(tickWithX$,left$,right$).pipe(
+  const source$ = merge(tickWithX$,left$,right$,down$).pipe(
       scan((s:State,value) => { // the value is the value emitted from the stream mainly used when the left$ and right$ is pressed
         // we get the current greenBlock of the current game state, and we check if it has touched the boundary or not
         // if it didnt touch the boundary, we modify the y-coor of the block with a fixed value, and x-coor depending on the input keyboard pressed times, then copy all the data to assign to the state,
@@ -255,7 +245,7 @@ export function main() {
         // if it touched the boundary, we changed the the block colour to red, means that the game need to create a new block
         // if current game state does not have green block, we need to create one for it as well
         const greenBlock = s.blocks.filter(block => !block.placed)[0]
-        const isTouched = touchBoundaryOrBlock(greenBlock,s)
+        const isTouched = touchBoundaryOrBlock(greenBlock,s)    
         s = afterTouched(s,isTouched.y,greenBlock,value.x,isTouched.isTouched)
         return s
       },initialState)
