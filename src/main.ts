@@ -16,15 +16,7 @@ import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
 import { map, filter, scan, takeUntil } from "rxjs/operators";
 import { Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, KeyPressValue} from './types'
-import { initialState, createState, createBlock } from './state'
-/**
- * Updates the state by proceeding with one time step.
- *
- * @param s Current state
- * @returns Updated state
- */
-const tick = (s: State) => s;
-
+import { initialState, createState as tick, createBlock } from './state'
 /** Rendering (side effects) */
 
 /**
@@ -161,7 +153,7 @@ export function main() {
           const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
           const ifnewXOverlap = block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd
           if(bothSameX || ifnewXOverlap) {
-            if(block.y >= eBlockYIn){
+            if(block.y >= eBlockYIn && block.y <= eBlock.y){ //if current block's y-coor is within the range of other block
               return {y: eBlockYIn, isTouched: true}
             }
           }
@@ -190,11 +182,13 @@ export function main() {
     }
     return ERROR_Y_AND_ISTOUCHED //handle the situation where it does not match any situations
   }
+
+
   const afterTouched = (s:State, minY: number | null, greenBlock: Block, operator: KeyPressValue, touched: boolean) => {
     if(minY != Infinity && touched && greenBlock){
       const block = createBlock(greenBlock,{placed: true, style: "fill: red"})
       const afterFiltering = s.blocks.filter(block => block.placed)
-      s = createState(s,{blocks: [...afterFiltering,block]})
+      s = tick(s,{blocks: [...afterFiltering,block]})
     }
     const newGreenBlock = s.blocks.filter(block => !block.placed)[0]
     if(!newGreenBlock){
@@ -207,7 +201,7 @@ export function main() {
         placed: false,
         style: "fill: green"
       }
-      s = createState(s,{blocks: [...s.blocks,block], blockCount: s.blockCount + 1})
+      s = tick(s,{blocks: [...s.blocks,block], blockCount: s.blockCount + 1})
     }
     else{
       // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
@@ -216,26 +210,25 @@ export function main() {
       const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - greenBlock.width
       const findX = (operator:string | null) => {
           if(operator === "+X"){
-            const x = greenBlock.x + greenBlock.width
+            const x = greenBlock.x + greenBlock.width/2
             return  x <= RIGHT_BOUNDARY ? x : RIGHT_BOUNDARY
           }
           else{
-            const x = greenBlock.x - greenBlock.width
+            const x = greenBlock.x - greenBlock.width/2
             return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
           }
       }
       const x = operator === "+X" || operator === "-X" ? findX(operator) : greenBlock.x
-      console.log(x)
-      const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
-      const altGreenBlock = createBlock(greenBlock, {x: x, y: greenBlock.y + 25 + y})
+      // const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
+      const altGreenBlock = createBlock(greenBlock, {x: x, y: greenBlock.y + 25})
       const newY = touchBoundaryOrBlock(altGreenBlock,s)
       const afterFiltering = s.blocks.filter(block => block.placed)
       if(newY.y != Infinity){
         const newBlock = createBlock(altGreenBlock,{y:newY.y})
-        s = createState(s,{blocks: [...afterFiltering,newBlock]})
+        s = tick(s,{blocks: [...afterFiltering,newBlock]})
       }
       else{
-        s = createState(s,{blocks: [...afterFiltering,altGreenBlock]})
+        s = tick(s,{blocks: [...afterFiltering,altGreenBlock]})
       }
     }
     return s
