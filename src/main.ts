@@ -14,9 +14,9 @@
 
 import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
-import { map, filter, scan, takeUntil } from "rxjs/operators";
-import { Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, KeyPressValue} from './types'
-import { initialState, createState as tick, createBlock } from './state'
+import { map, filter, scan, takeUntil, min } from "rxjs/operators";
+import { Block, Body, Key, Event, State, Viewport, Constants, KeyPressValue} from './types'
+import { initialState, createState as tick, createBlock, create22square, createInitialBlock } from './state'
 /** Rendering (side effects) */
 
 /**
@@ -112,14 +112,24 @@ export function main() {
   const render = (s: State) => {
     // Add blocks to the main grid canvas
     // reset the svg before adding any element
-    svg.innerHTML = '';
+    const blocks = svg.querySelectorAll(".block")
+    blocks.forEach(block => {svg.removeChild(block)})
     s.blocks.forEach(block => {
       //render each block based on its props
-      const cube = createSvgElement(svg.namespaceURI, "rect");
-      Object.entries(block).forEach(([key, val]) => 
-        cube.setAttribute(key, String(val))
-      );
-      svg.appendChild(cube);
+      if(block){
+        const cube = createSvgElement(svg.namespaceURI, "rect", {
+          id: `${block.id}`,
+          parentId: `${block.parentId}`,
+          x: `${block.x}`,
+          y: `${block.y}`,
+          width: `${block.width}`,
+          height:  `${block.height}`,
+          placed: `${block.parentId}`,
+          style: `${block.style}`,
+          class: "block"
+        })
+        svg.appendChild(cube)
+      }
     });
     }
 
@@ -127,25 +137,25 @@ export function main() {
   const tickWithX$ = tick$.pipe(
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
-  const touchBoundaryOrBlock = (block: Block, s: State): {y: number, isTouched: boolean} => {
-    const ERROR_Y_AND_ISTOUCHED = {y: Infinity, isTouched: true}
-    const reachBoundaryY = () => {
-      const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
-      if(block.y >= BOTTOM_BOUNDARY){
-        return {y: BOTTOM_BOUNDARY, isTouched: true}
+
+  const touchBoundaryOrBlock = (block: (Block|null)[], s: State): {y: number, isTouched: boolean}[] => {
+    const minYs = block.map( block => {
+      const ERROR_Y_AND_ISTOUCHED = {y: Infinity, isTouched: false}
+      if(!block){ // null-error handling
+        return ERROR_Y_AND_ISTOUCHED
+      }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
+      const reachBoundaryY = () => {
+        const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
+        if(block.y >= BOTTOM_BOUNDARY){
+          console.log("lll")
+          return {y: BOTTOM_BOUNDARY, isTouched: true}
+        }
+        else{
+          return {y: block.y, isTouched: false}
+        }
       }
-    }
-    if(!block){ // null-error handling
-      return ERROR_Y_AND_ISTOUCHED
-    }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
-    if(s.blockCount == 1) {
-      //if the block touches the boundary
-      const returnValue = reachBoundaryY()
-      if(returnValue) return returnValue
-    }
-    else{
       const newBlocks = s.blocks.map(eBlock => {
-        if(eBlock.id !== block.id){ // we do not want to check the same block in the array
+        if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){ // we do not want to check the same block in the array
           const eBlockXEnd = eBlock.x + eBlock.width
           const eBlockYIn = eBlock.y - eBlock.height
           const blockXEnd = block.x + block.width
@@ -158,92 +168,98 @@ export function main() {
             }
           }
           //if the block touches the boundary
-          const returnValue = reachBoundaryY()
-          if(returnValue) return returnValue
-          else{
-            return {y: block.y, isTouched: false}
-          }
+          return reachBoundaryY()
         }
         else{
-          return ERROR_Y_AND_ISTOUCHED //handle the situation where it does not match any situations
+          return reachBoundaryY()
         }
       })
       //the newBlocks contains the informations of the current block whether touches boundary or any other blocks or neither of them
       // get the min Y-coor
       const minY = newBlocks.reduce((min,current) => {
-        if(current.isTouched && current!.y < min.y){
-          return {y: current.y, isTouched: true}
+        if(current.y < min.y){
+          return {y: current.y, isTouched: current.isTouched}
         }
         else{
           return {y: min.y, isTouched: min.isTouched}
         }
       }, ERROR_Y_AND_ISTOUCHED) 
       return minY
-    }
-    return ERROR_Y_AND_ISTOUCHED //handle the situation where it does not match any situations
+    })
+    return minYs
   }
 
 
-  const afterTouched = (s:State, minY: number | null, greenBlock: Block, operator: KeyPressValue, touched: boolean) => {
-    if(minY != Infinity && touched && greenBlock){
-      const block = createBlock(greenBlock,{placed: true, style: "fill: red"})
-      const afterFiltering = s.blocks.filter(block => block.placed)
-      s = tick(s,{blocks: [...afterFiltering,block]})
+  const afterTouched = (s:State, minY: number | null, currentBlocks: Block[], operator: KeyPressValue, touched: boolean) => {
+    const newCurrentBlock = s.blocks.filter(block => !block.placed)
+    if( !newCurrentBlock.length || currentBlocks.length == 0){
+      const block = create22square(s)
+      return tick(s,{blocks: [...s.blocks,...block], blockCount: s.blockCount + block.length, bigBlockCount: s.bigBlockCount + 1})
     }
-    const newGreenBlock = s.blocks.filter(block => !block.placed)[0]
-    if(!newGreenBlock){
-      const block: Block = {
-        id: `${s.blockCount}`,
-        x: Viewport.CANVAS_WIDTH/2,
-        y: 0,
-        width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-        height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
-        placed: false,
-        style: "fill: green"
-      }
-      s = tick(s,{blocks: [...s.blocks,block], blockCount: s.blockCount + 1})
-    }
-    else{
-      // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
-      // if yes, use the canvas.weight - the block's width as its y-coor
-      const LEFT_BOUNDARY = 0
-      const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - greenBlock.width
-      const findX = (operator:string | null) => {
-          if(operator === "+X"){
-            const x = greenBlock.x + greenBlock.width/2
-            return  x <= RIGHT_BOUNDARY ? x : RIGHT_BOUNDARY
-          }
-          else{
-            const x = greenBlock.x - greenBlock.width/2
-            return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
-          }
-      }
-      const x = operator === "+X" || operator === "-X" ? findX(operator) : greenBlock.x
-      // const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
-      const altGreenBlock = createBlock(greenBlock, {x: x, y: greenBlock.y + 25})
-      const newY = touchBoundaryOrBlock(altGreenBlock,s)
-      const afterFiltering = s.blocks.filter(block => block.placed)
-      if(newY.y != Infinity){
-        const newBlock = createBlock(altGreenBlock,{y:newY.y})
-        s = tick(s,{blocks: [...afterFiltering,newBlock]})
+    const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
+      if(minY != Infinity && touched && currentBlock){
+        const block = createBlock(currentBlock,{placed: true})
+        return block
       }
       else{
-        s = tick(s,{blocks: [...afterFiltering,altGreenBlock]})
+        // we check if the current y-coor of the block + the value will exceed the canvas or not, if not just add it,
+        // if yes, use the canvas.weight - the block's width as its y-coor
+        const LEFT_BOUNDARY = 0
+        const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - currentBlock.width
+        const findX = (operator:string | null)  => {
+            if(operator === "+X"){
+              const x = currentBlock.x + currentBlock.width/2
+              return  x <= RIGHT_BOUNDARY ? x : RIGHT_BOUNDARY
+            }
+            else{
+              const x = currentBlock.x - currentBlock.width/2
+              return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
+            }
+        }
+        const x = operator === "+X" || operator === "-X" ? findX(operator) : currentBlock.x
+        // const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
+        const altBlock = createBlock(currentBlock, {x: x, y: currentBlock.y + 25})
+        return altBlock
       }
-    }
-    return s
+    })
+    const newY = touchBoundaryOrBlock(altCurrentBlocks,s) 
+    const afterFiltering = s.blocks.filter(block => block.placed)
+    const newBlocks = newY.map( (newY,index) => {
+      if(newY.y != Infinity){
+        if(altCurrentBlocks[index] != null){
+          const newBlock = createBlock(altCurrentBlocks[index] as Block,{y:newY.y})
+          return newBlock
+        }
+      }
+      else{
+        if(altCurrentBlocks[index] != null){
+          return altCurrentBlocks[index]
+        }
+      }
+      throw new Error("No return value specified for newBlocks mapping");
+    }) 
+
+    return tick(s,{blocks: [...afterFiltering,...newBlocks]})
   }
 
   const source$ = merge(tickWithX$,left$,right$,down$).pipe(
       scan((s:State,value) => { // the value is the value emitted from the stream mainly used when the left$ and right$ is pressed
-        // we get the current greenBlock of the current game state, and we check if it has touched the boundary or not
+        // we get the currentBlock of the current game state, and we check if it has touched the boundary or not
         // if it didnt touch the boundary, we modify the y-coor of the block with a fixed value, and x-coor depending on the input keyboard pressed times, then copy all the data to assign to the state,
         // and ready for the next interval
         // if it touched the boundary, we changed the the block colour to red, means that the game need to create a new block
-        // if current game state does not have green block, we need to create one for it as well
-        const greenBlock = s.blocks.filter(block => !block.placed)[0]
-        const isTouched = touchBoundaryOrBlock(greenBlock,s)    
-        s = afterTouched(s,isTouched.y,greenBlock,value.x,isTouched.isTouched)
+        // if current game state does not have block that has not been placed yet, we need to create one for it as well
+        const currentBlock = s.blocks.filter(block => !block.placed)
+        const isTouched = touchBoundaryOrBlock(currentBlock,s)
+        if(isTouched.length == 0){
+          s = afterTouched(s,null,currentBlock,value.x,false)
+        }
+        else{
+          isTouched.forEach( isTouched => {
+            s = afterTouched(s,isTouched.y,currentBlock,value.x,isTouched.isTouched)
+          }) 
+        }  
+        console.log(s)
         return s
       },initialState)
     ).subscribe((s:State) => {

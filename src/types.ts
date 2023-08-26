@@ -12,13 +12,13 @@ const Constants = {
   TICK_RATE_MS: 500,//500
   GRID_WIDTH: 10,
   GRID_HEIGHT: 20,
-  DOWN_SPEED: 10
+  DOWN_SPEED: 10,
 } as const;
 
 /**
  * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
  */
-type ObjectId = Readonly<{ id: String }>
+type ObjectId = Readonly<{ id: String, parentId: String}>
 
 interface Block extends ObjectId{
   width: number,
@@ -26,7 +26,8 @@ interface Block extends ObjectId{
   x: number,
   y: number,
   placed: boolean,
-  style: String
+  style: String,
+  class: String
 }
 
 type Body = Readonly<Block>
@@ -44,6 +45,7 @@ type State = Readonly<{
   gameEnd: boolean;
   score: number;
   blocks: ReadonlyArray<Body>;
+  bigBlockCount: number;
   blockCount: number;
 }>;
 
@@ -55,8 +57,8 @@ type KArgumentState<T extends StateProperty> = {
   [key: string]: StatePropertyValue<T> 
 }
 
-type BlockProperty = keyof Block
-type BlockPropertyValue<T extends BlockProperty> = Block[T]
+type BlockProperty = keyof Body
+type BlockPropertyValue<T extends BlockProperty> = Body[T]
 type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
