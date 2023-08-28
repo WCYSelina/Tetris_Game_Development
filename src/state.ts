@@ -1,5 +1,5 @@
 export{ initialState, tick as createState, createBlock, create22square, createInitialBlock }
-import { Block,State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Body} from './types'
+import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block} from './types'
 
 const initialState: State = {
     gameEnd: false,
@@ -35,9 +35,9 @@ const createBlock = <T extends BlockProperty> (block: Block, k: KArgumentBlock<T
   }
 }
 
-const createInitialBlock = (s:State, colour: string, x: number, y: number): Block => {
+const createInitialBlock = (s:State, colour: String, x: number, y: number, id: number = 0): Block => {
   const block: Block = { 
-    id: `${s.blockCount}`,
+    id: `${id}`,
     parentId: `${s.bigBlockCount}`,
     x: x,
     y: y,
@@ -50,12 +50,12 @@ const createInitialBlock = (s:State, colour: string, x: number, y: number): Bloc
   return block
 }
 
-const create22square = (s:State): Body[] => {
-  const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0) 
-  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,0)
-  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,block2.y+block2.height)
-  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,block2.y+block2.height)
+const create22square = (s:State): Block[] => {
+  const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1) 
+  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,0, s.blockCount + 2)
+  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,block2.y+block2.height, s.blockCount + 3)
+  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,block2.y+block2.height, s.blockCount + 4)
   
-  return [block3, block4, block1, block2]
+  return [block1, block2, block3, block4]
 }
 

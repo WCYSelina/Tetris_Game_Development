@@ -1,5 +1,5 @@
 export { Constants, Viewport}
-export type { ObjectId, Block, Body, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue}
+export type { ObjectId, Block as Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue}
 /** Constants */
 const Viewport = {
   CANVAS_WIDTH: 200,
@@ -20,7 +20,7 @@ const Constants = {
  */
 type ObjectId = Readonly<{ id: String, parentId: String}>
 
-interface Block extends ObjectId{
+interface IBlock extends ObjectId{
   width: number,
   height: number,
   x: number,
@@ -30,7 +30,7 @@ interface Block extends ObjectId{
   class: String
 }
 
-type Body = Readonly<Block>
+type Block = Readonly<IBlock>
 /** User input */
 
 type Key = "KeyS" | "KeyA" | "KeyD";
@@ -44,7 +44,7 @@ type Event = "keydown" | "keyup" | "keypress";
 type State = Readonly<{
   gameEnd: boolean;
   score: number;
-  blocks: ReadonlyArray<Body>;
+  blocks: ReadonlyArray<Block>;
   bigBlockCount: number;
   blockCount: number;
 }>;
@@ -57,8 +57,8 @@ type KArgumentState<T extends StateProperty> = {
   [key: string]: StatePropertyValue<T> 
 }
 
-type BlockProperty = keyof Body
-type BlockPropertyValue<T extends BlockProperty> = Body[T]
+type BlockProperty = keyof Block
+type BlockPropertyValue<T extends BlockProperty> = Block[T]
 type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
