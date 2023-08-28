@@ -1,5 +1,16 @@
-export {findTouched}
+export {findNotValidMove, findTopEdgePos, findRightEdgePos}
+import { Block} from "./types"
 
-const findTouched = (isTouched: boolean[]) => isTouched.reduce((flag,current) => {
+
+const findNotValidMove = (isTouched: boolean[]) => isTouched.reduce((flag,current) => {
     return !current ? current : flag
-  })
+})
+
+const findTopEdgePos = (block: Block) => {
+    return block.y - block.height
+}
+
+const findRightEdgePos = (block: Block) => {
+    return block.x + block.width
+}
+

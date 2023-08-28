@@ -17,7 +17,7 @@ import { fromEvent, interval, merge} from "rxjs";
 import { map, filter, scan } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue} from './types'
 import { initialState, createState as tick, createBlock, create22square } from './state'
-import { findTouched } from "./utils";
+import { findRightEdgePos, findTopEdgePos, findNotValidMove } from "./utils";
 /** Rendering (side effects) */
 
 /**
@@ -93,7 +93,6 @@ export function main() {
       }))
       );
     
-    
   const left$ = fromKey("KeyA", "-X");
   const right$ = fromKey("KeyD", "+X");
   const down$ = fromKey("KeyS", "+Y" );
@@ -139,46 +138,13 @@ export function main() {
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
 
-  const touchCheck = (blocks: Block[], s: State): boolean => {
-    const minYs = blocks.map( block => {
-      if(!block){ // null-error handling
-        return false
-        // return {x: false, y: false}
-      }
-      const reachBoundaryY = () => {
-        const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
-        // return block.y > BOTTOM_BOUNDARY ? {x: false, y: false} : {x: true, y: true}
-        return block.y > BOTTOM_BOUNDARY ? false : true
-      }
-      const newBlocks = s.blocks.map(eBlock => {
-        if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){ // we do not want to check the same block in the array
-          const eBlockXEnd = eBlock.x + eBlock.width
-          const eBlockYIn = eBlock.y - eBlock.height
-          const blockXEnd = block.x + block.width
-          //if the x-coor of blocak is within the range of eBlock.x(initial) and eBlockXEnd
-          const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
-          if(bothSameX){
-            if(block.y > eBlockYIn){
-              return false
-            }
-          }
-          return reachBoundaryY()
-        }
-        return reachBoundaryY()
-      })
-      //the newBlocks contains the informations of the current block whether touches boundary or any other blocks or neither of them
-      // get the min Y-coor
-      return findTouched(newBlocks)
-    })
-
-    return findTouched(minYs)
-
-  }
-
   const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ) => {
+    //pre move the blocks in a one big block
     const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
         const LEFT_BOUNDARY = 0
         const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - currentBlock.width
+
+        //check which key has been inputted, and change the x value 
         const findX = (operator:string | null)  => {
             if(operator === "+X"){
               const x = currentBlock.x + currentBlock.width
@@ -189,86 +155,119 @@ export function main() {
               return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
             }
         }
+        //only change the x-coor when the key left and right is pressed
         const x = operator === "+X" || operator === "-X" ? findX(operator) : currentBlock.x
         const altBlock = createBlock(currentBlock, {x: x, y: currentBlock.y + currentBlock.width})
         
         return altBlock
-      // }
     })
     return altCurrentBlocks
+  }
+
+  const checkYValid = (blocks: Block[], s: State): boolean => {
+    const minYs = blocks.map( block => {
+      const reachBoundaryY = () => {
+        //check if the block touches boundary
+        const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
+        return block.y > BOTTOM_BOUNDARY ? false : true
+      }
+      const newBlocks = s.blocks.map(eBlock => {
+        if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){ // we only want to check the blocks that are not in the big block
+           //if the blocks has same x-coor
+          if(block.x === eBlock.x && findRightEdgePos(block) === findRightEdgePos(block)){
+            //and if current block's y-coor is within the range of other block
+            if(block.y > findTopEdgePos(eBlock)){
+              return false
+            }
+          }
+          //check if it touches boundary
+          return reachBoundaryY()
+        }
+        return reachBoundaryY()
+      })
+      //find if there is any not valid move
+      return findNotValidMove(newBlocks)
+    })
+    //if one block in a big block has invalid move, all blocks have invalid moves
+    return findNotValidMove(minYs)
   }
 
   const checkLeftRight = (s: State, blocks: Block[]): boolean => {
     const leftRightFlags = blocks.map(block => {
       const leftRightFlag = s.blocks.map(eBlock => {
+        // we only want to check the blocks that are not in the big block
         if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){
-          const eBlockXEnd = eBlock.x + eBlock.width
-          const eBlockYIn = eBlock.y - eBlock.height
-          const blockXEnd = block.x + block.width
-          const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
-          if(bothSameX){
-            if(block.y > eBlockYIn && block.y <= eBlock.y){ //if current block's y-coor is within the range of other block
+          //if the blocks has same x-coor
+          if(block.x === eBlock.x &&
+             findRightEdgePos(block) === findRightEdgePos(block)){
+              //and if current block's y-coor is within the range of other block
+            if(block.y > findTopEdgePos(eBlock) && block.y <= eBlock.y){ 
+              //it is not able to move, hence return false
               return false
             }
           }
         }
         return true
       })
-      return findTouched(leftRightFlag)
+      //find if there is any not valid move
+      return findNotValidMove(leftRightFlag)
     })
-    return findTouched(leftRightFlags)
+    //if one block in a big block has invalid move, all blocks have invalid moves
+    return findNotValidMove(leftRightFlags)
   }
 
-  //check x then check y
+  const stateMoveHandling = (s: State, ableToMove: boolean, blocks: Block[], currentBlocks: Block[], previousBlock: Block[]) => {
+    //if y is a valid move, we just update the game state of the blocks property with the blocks that passed into this function
+    //if it cant be moved, we used back the blocks that at the start of this tick, but just change the placed property to true,
+    //so that the blocks are finalised
+    if(ableToMove){
+      return tick(s,{blocks: [...previousBlock,...blocks]})
+    }
+    else{
+      const placedAllBlock = currentBlocks.map((block => {
+        return createBlock(block,{placed:true})
+      }))
+      return tick(s,{blocks: [...previousBlock,...placedAllBlock]})
+    }
+  }
 
   const source$ = merge(tickWithX$,left$,right$,down$).pipe(
-      scan((s:State,value) => { // the value is the value emitted from the stream mainly used when the left$ and right$ is pressed
-        // we get the currentBlock of the current game state, and we check if it has touched the boundary or not
-        // if it didnt touch the boundary, we modify the y-coor of the block with a fixed value, and x-coor depending on the input keyboard pressed times, then copy all the data to assign to the state,
-        // and ready for the next interval
-        // if it touched the boundary, we changed the the block colour to red, means that the game need to create a new block
-        // if current game state does not have block that has not been placed yet, we need to create one for it as well
+      scan((s:State,value) => {
+        //take out the block that has not been placed yet (the player still can move these blocks)
         const currentBlocks = s.blocks.filter(block => !block.placed)
+        //take out the block that has been placed (the player can't move these blocks anymore)
         const previousBlock =  s.blocks.filter(block => block.placed)
+
+        //if the current game state does not have any blocks that is not placed, we would like to create some new ones
         if(!currentBlocks.length){
           const block = create22square(s)
-          return tick(s,{blocks: [...s.blocks,...block], blockCount: s.blockCount + block.length, bigBlockCount: s.bigBlockCount + 1})
-        }
-        const moveCurrentBlock = moveBlock(s, currentBlocks, value.x) //first move
-        const xFlag = checkLeftRight(s,moveCurrentBlock)
-
-        const stateMoveHandling = (isTouched: boolean, blocks: Block[]) => {
-          if(isTouched){
-            const newMovedCurrentBlock = blocks.map(((block, index) => {
-              return createBlock(block,{y:blocks[index].y})
-            }))
-            s = tick(s,{blocks: [...previousBlock,...newMovedCurrentBlock]})
-          }
-          else{
-            const placedAllBlock = currentBlocks.map((block => {
-              return createBlock(block,{placed:true})
-            }))
-            s = tick(s,{blocks: [...previousBlock,...placedAllBlock]})
-          }
+          return tick(s,{blocks: [...s.blocks,...block], 
+            blockCount: s.blockCount + block.length, 
+            bigBlockCount: s.bigBlockCount + 1})
         }
 
-        if(!xFlag){
+        //pre-move the blocks
+        const moveCurrentBlock = moveBlock(s, currentBlocks, value.x)
+
+        //first check if x-coor can be updated successfully
+        //the only check if y-coor can be updated successfully
+
+        //if it cant be updated successfully
+        if(!checkLeftRight(s,moveCurrentBlock)){
+          //we copy the pre-moved blocks and change their x-coor to original coor
           const newMovedCurrentBlock = moveCurrentBlock.map(((block, index) => {
             return createBlock(block,{x: currentBlocks[index].x})
           }))
-          const isTouched =  touchCheck(newMovedCurrentBlock,s)
-          stateMoveHandling(isTouched,newMovedCurrentBlock)
+          //then check if y-coor can be updated successfully
+          //and update the state
+          const validMove =  checkYValid(newMovedCurrentBlock,s)
+          return stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
         }
         else{
-          const isTouched = touchCheck(moveCurrentBlock,s)
-          stateMoveHandling(isTouched,moveCurrentBlock)
-
+          //this means that x-coor is updated successfully
+          const validMove = checkYValid(moveCurrentBlock,s)
+          return stateMoveHandling(s, validMove, moveCurrentBlock, currentBlocks, previousBlock)
         }
-      
-         // then check if it is a valid move
-        //if not adjust the position
-        console.log(s)
-        return s
       },initialState)
     ).subscribe((s:State) => {
       render(s)
