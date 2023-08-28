@@ -145,14 +145,12 @@ export function main() {
         const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - currentBlock.width
 
         //check which key has been inputted, and change the x value 
-        const findX = (operator:string | null)  => {
+        const findX = (operator: string | null)  => {
             if(operator === "+X"){
-              const x = currentBlock.x + currentBlock.width
-              return  x <= RIGHT_BOUNDARY ? x : RIGHT_BOUNDARY
+              return currentBlock.x + currentBlock.width
             }
             else{
-              const x = currentBlock.x - currentBlock.width
-              return x >= LEFT_BOUNDARY ? x : LEFT_BOUNDARY
+              return currentBlock.x - currentBlock.width
             }
         }
         //only change the x-coor when the key left and right is pressed
@@ -194,6 +192,12 @@ export function main() {
 
   const checkLeftRight = (s: State, blocks: Block[]): boolean => {
     const leftRightFlags = blocks.map(block => {
+      const reachBoundaryX = () => {
+        //check if the block touches boundary
+        const LEFT_BOUNDARY = 0
+        const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - block.width
+        return block.x < LEFT_BOUNDARY || block.x > RIGHT_BOUNDARY ? false : true
+      }
       const leftRightFlag = s.blocks.map(eBlock => {
         // we only want to check the blocks that are not in the big block
         if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){
@@ -206,8 +210,9 @@ export function main() {
               return false
             }
           }
+          return reachBoundaryX()
         }
-        return true
+        return reachBoundaryX()
       })
       //find if there is any not valid move
       return findNotValidMove(leftRightFlag)
