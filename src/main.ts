@@ -13,10 +13,11 @@
  */
 
 import "./style.css";
-import { fromEvent, interval, merge, Subscription} from "rxjs";
-import { map, filter, scan, takeUntil, min } from "rxjs/operators";
+import { fromEvent, interval, merge} from "rxjs";
+import { map, filter, scan } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue} from './types'
-import { initialState, createState as tick, createBlock, create22square, createInitialBlock } from './state'
+import { initialState, createState as tick, createBlock, create22square } from './state'
+import { findTouched } from "./utils";
 /** Rendering (side effects) */
 
 /**
@@ -138,19 +139,16 @@ export function main() {
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
 
-  const touchBoundaryOrBlock = (blocks: Block[], s: State): boolean[] => {
+  const touchCheck = (blocks: Block[], s: State): boolean => {
     const minYs = blocks.map( block => {
       if(!block){ // null-error handling
         return false
-      }// if the dist != 0 means that this function is checking if the block touches another block instead of boundary
+        // return {x: false, y: false}
+      }
       const reachBoundaryY = () => {
         const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
-        if(block.y > BOTTOM_BOUNDARY){
-          return false
-        }
-        else{
-          return true
-        }
+        // return block.y > BOTTOM_BOUNDARY ? {x: false, y: false} : {x: true, y: true}
+        return block.y > BOTTOM_BOUNDARY ? false : true
       }
       const newBlocks = s.blocks.map(eBlock => {
         if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){ // we do not want to check the same block in the array
@@ -159,36 +157,25 @@ export function main() {
           const blockXEnd = block.x + block.width
           //if the x-coor of blocak is within the range of eBlock.x(initial) and eBlockXEnd
           const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
-          const ifnewXOverlap = block.x > eBlock.x && block.x < eBlockXEnd || blockXEnd > eBlock.x && blockXEnd < eBlockXEnd
-          if(bothSameX || ifnewXOverlap) {
-            if(block.y > eBlockYIn && block.y <= eBlock.y){ //if current block's y-coor is within the range of other block
+          if(bothSameX){
+            if(block.y > eBlockYIn){
               return false
             }
           }
-          //if the block touches the boundary
           return reachBoundaryY()
         }
-        else{
-          return reachBoundaryY()
-        }
+        return reachBoundaryY()
       })
       //the newBlocks contains the informations of the current block whether touches boundary or any other blocks or neither of them
       // get the min Y-coor
-      const minY = newBlocks.reduce((flag,current) => {
-        if(!current){
-          return current
-        }
-        else{
-          return flag
-        }
-      })
-      return minY
+      return findTouched(newBlocks)
     })
-    return minYs
+
+    return findTouched(minYs)
+
   }
 
-
-  const afterTouched = (s:State, currentBlocks: Block[], operator: KeyPressValue ) => {
+  const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ) => {
     const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
         const LEFT_BOUNDARY = 0
         const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - currentBlock.width
@@ -203,7 +190,6 @@ export function main() {
             }
         }
         const x = operator === "+X" || operator === "-X" ? findX(operator) : currentBlock.x
-        // const y = operator === "+Y" ? greenBlock.y + Constants.DOWN_SPEED : 0 
         const altBlock = createBlock(currentBlock, {x: x, y: currentBlock.y + currentBlock.width})
         
         return altBlock
@@ -211,6 +197,29 @@ export function main() {
     })
     return altCurrentBlocks
   }
+
+  const checkLeftRight = (s: State, blocks: Block[]): boolean => {
+    const leftRightFlags = blocks.map(block => {
+      const leftRightFlag = s.blocks.map(eBlock => {
+        if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){
+          const eBlockXEnd = eBlock.x + eBlock.width
+          const eBlockYIn = eBlock.y - eBlock.height
+          const blockXEnd = block.x + block.width
+          const bothSameX = block.x === eBlock.x && blockXEnd === eBlockXEnd
+          if(bothSameX){
+            if(block.y > eBlockYIn && block.y <= eBlock.y){ //if current block's y-coor is within the range of other block
+              return false
+            }
+          }
+        }
+        return true
+      })
+      return findTouched(leftRightFlag)
+    })
+    return findTouched(leftRightFlags)
+  }
+
+  //check x then check y
 
   const source$ = merge(tickWithX$,left$,right$,down$).pipe(
       scan((s:State,value) => { // the value is the value emitted from the stream mainly used when the left$ and right$ is pressed
@@ -225,33 +234,39 @@ export function main() {
           const block = create22square(s)
           return tick(s,{blocks: [...s.blocks,...block], blockCount: s.blockCount + block.length, bigBlockCount: s.bigBlockCount + 1})
         }
+        const moveCurrentBlock = moveBlock(s, currentBlocks, value.x) //first move
+        const xFlag = checkLeftRight(s,moveCurrentBlock)
 
-        const moveCurrentBlock = afterTouched(s, currentBlocks, value.x) //first move
-        const isTouched = touchBoundaryOrBlock(moveCurrentBlock,s) // then check if it is a valid move
-        //if not adjust the position
-        console.log("istouched")
-        console.log(moveCurrentBlock)
-        console.log(isTouched)
-        console.log("istouched")
+        const stateMoveHandling = (isTouched: boolean, blocks: Block[]) => {
+          if(isTouched){
+            const newMovedCurrentBlock = blocks.map(((block, index) => {
+              return createBlock(block,{y:blocks[index].y})
+            }))
+            s = tick(s,{blocks: [...previousBlock,...newMovedCurrentBlock]})
+          }
+          else{
+            const placedAllBlock = currentBlocks.map((block => {
+              return createBlock(block,{placed:true})
+            }))
+            s = tick(s,{blocks: [...previousBlock,...placedAllBlock]})
+          }
+        }
 
-       const ableToMove = isTouched.reduce((flag,current) => {
-        if(!current){
-          return current
-        }
-        else{
-          return flag
-        }
-        })
-
-        if(ableToMove){
-          s = tick(s,{blocks: [...previousBlock,...moveCurrentBlock]})
-        }
-        else{
-          const placedAllBlock = currentBlocks.map((block => {
-            return createBlock(block,{placed:true})
+        if(!xFlag){
+          const newMovedCurrentBlock = moveCurrentBlock.map(((block, index) => {
+            return createBlock(block,{x: currentBlocks[index].x})
           }))
-          s = tick(s,{blocks: [...previousBlock,...placedAllBlock]})
+          const isTouched =  touchCheck(newMovedCurrentBlock,s)
+          stateMoveHandling(isTouched,newMovedCurrentBlock)
         }
+        else{
+          const isTouched = touchCheck(moveCurrentBlock,s)
+          stateMoveHandling(isTouched,moveCurrentBlock)
+
+        }
+      
+         // then check if it is a valid move
+        //if not adjust the position
         console.log(s)
         return s
       },initialState)
