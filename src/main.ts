@@ -13,11 +13,11 @@
  */
 
 import "./style.css";
-import { fromEvent, interval, merge} from "rxjs";
+import { fromEvent, interval, merge, Subscription} from "rxjs";
 import { map, filter, scan } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue} from './types'
 import { initialState, createState as tick, createBlock, create22square } from './state'
-import { findRightEdgePos, findTopEdgePos, findNotValidMove } from "./utils";
+import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from "./utils";
 /** Rendering (side effects) */
 
 /**
@@ -184,10 +184,10 @@ export function main() {
         return reachBoundaryY()
       })
       //find if there is any not valid move
-      return findNotValidMove(newBlocks)
+      return reduceUtil(newBlocks,false)
     })
     //if one block in a big block has invalid move, all blocks have invalid moves
-    return findNotValidMove(minYs)
+    return reduceUtil(minYs,false)
   }
 
   const checkLeftRight = (s: State, blocks: Block[]): boolean => {
@@ -215,10 +215,10 @@ export function main() {
         return reachBoundaryX()
       })
       //find if there is any not valid move
-      return findNotValidMove(leftRightFlag)
+      return reduceUtil(leftRightFlag,false)
     })
     //if one block in a big block has invalid move, all blocks have invalid moves
-    return findNotValidMove(leftRightFlags)
+    return reduceUtil(leftRightFlags,false)
   }
 
   const stateMoveHandling = (s: State, ableToMove: boolean, blocks: Block[], currentBlocks: Block[], previousBlock: Block[]) => {
@@ -232,11 +232,27 @@ export function main() {
       const placedAllBlock = currentBlocks.map((block => {
         return createBlock(block,{placed:true})
       }))
-      return tick(s,{blocks: [...previousBlock,...placedAllBlock]})
+      s = tick(s,{blocks: [...previousBlock,...placedAllBlock]})
+      const placedBlock =  s.blocks.filter(block => block.placed)
+      const ifGameEnds = checkGameEnds(placedBlock)
+      return ifGameEnds ? tick(s, {gameEnd: true}) : s
     }
   }
 
-  const source$ = merge(tickWithX$,left$,right$,down$).pipe(
+  const checkGameEnds = (blocks: Block[]) => {
+    if(blocks.length){
+      const flags = blocks.map(block => {
+        if(block.y === 0){
+          return true
+        }
+        return false
+      })
+      return reduceUtil(flags,true)
+    }
+    return false
+  }
+
+  const source$: Subscription = merge(tickWithX$,left$,right$,down$).pipe(
       scan((s:State,value) => {
         //take out the block that has not been placed yet (the player still can move these blocks)
         const currentBlocks = s.blocks.filter(block => !block.placed)
@@ -278,6 +294,7 @@ export function main() {
       render(s)
       if (s.gameEnd) {
         show(gameover);
+        source$.unsubscribe()
       } else {
         hide(gameover);
       }

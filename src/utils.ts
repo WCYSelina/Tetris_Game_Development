@@ -1,8 +1,11 @@
-export {findNotValidMove, findTopEdgePos, findRightEdgePos}
+export {reduceUtil as findNotValidMove, findTopEdgePos, findRightEdgePos}
 import { Block} from "./types"
 
 
-const findNotValidMove = (isTouched: boolean[]) => isTouched.reduce((flag,current) => {
+const reduceUtil = (isTouched: boolean[], typeTrue: boolean) => isTouched.reduce((flag,current) => {
+    if(typeTrue){
+        return current ? current : flag
+    }
     return !current ? current : flag
 })
 
