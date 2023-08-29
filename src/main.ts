@@ -271,36 +271,44 @@ export function main() {
   }
 
   const clearRow = (s: State, indexRow: (number | null)[] | null) => {
-    if(indexRow){
+    if(indexRow && indexRow.length){
       const state = indexRow.reduce((accS,row) => {
         if(row){
-          const clearBlocks = accS.blocks.filter(block => block.y !== row * block.height)
-          const allRows = s.allRows.map((column,cIndex) => {
-             const cRet = column.map((r, rIndex) => {
-              if(cIndex === row){
-                return false
-              }
-              else{
-                return s.allRows[cIndex][rIndex]
-              }})
-              console.log(cRet)
-              return cRet
-            })
-          return tick(s, {blocks: clearBlocks, allRows: allRows})
+          const clearBlocks = accS.blocks.filter(block => block.y < row * block.height)
+          const shiftedBlocks = shiftBlockAfterClear(clearBlocks,row)
+          if(shiftedBlocks){
+            console.log("heyyy")
+            return tick(s, {blocks: shiftedBlocks, allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))})
+          }
+          else{
+            console.log
+            return tick(s, {blocks: clearBlocks, allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))})
+          }
+          
         }
         return accS
       },s)
-      // console.log(state)
+      console.log(state)
       return state
     }
-    // console.log(s)
     return s
+  }
+
+  const shiftBlockAfterClear = (blocks: Block[], indexRow: number | null) => {
+    console.log("block")
+    console.log(blocks)
+    console.log("block")
+    if(indexRow){
+      console.log(indexRow)
+      const newBlocks = blocks.map(block => {
+        if(indexRow && block.y < indexRow * block.height){
+          return createBlock(block, {y: block.y + block.height})
+        }
+        return block
+      })
+      return newBlocks
     }
- 
-  const addBlockToRow = (s: State, block: Block) => {
-    const blocks = s.blocks.filter(blocks => blocks.id != block.id)
-    const newBlock = createBlock(block, {addBlockToRow: true})
-    return tick(s, {blocks: [...blocks, newBlock]})
+    return null
   }
 
   const checkGameEnds = (blocks: Block[]) => {
