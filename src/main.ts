@@ -14,8 +14,8 @@
 
 import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
-import { map, filter, scan } from "rxjs/operators";
-import { Block, Key, Event, State, Viewport, Constants, KeyPressValue} from './types'
+import { map, filter, scan, switchMap, reduce } from "rxjs/operators";
+import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows} from './types'
 import { initialState, createState as tick, createBlock, create22square } from './state'
 import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from "./utils";
 /** Rendering (side effects) */
@@ -141,9 +141,6 @@ export function main() {
   const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ) => {
     //pre move the blocks in a one big block
     const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
-        const LEFT_BOUNDARY = 0
-        const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - currentBlock.width
-
         //check which key has been inputted, and change the x value 
         const findX = (operator: string | null)  => {
             if(operator === "+X"){
@@ -239,6 +236,73 @@ export function main() {
     }
   }
 
+  const addBlockRowForClear = (s: State) => {
+    const placeBlocks = s.blocks.filter(block => block.placed)
+    const newArray = placeBlocks.reduce((allRows, block) => {
+      if(allRows[block.y/block.height][block.x/block.width] === false){
+        const row = allRows.map((row,cIndex) => {
+          const column = row.map((column,rIndex) => {
+            if(cIndex === block.y/block.height && rIndex === block.x/block.width){
+              return true
+            }
+            return allRows[cIndex][rIndex]
+          })
+          return column
+        })
+        return row
+      }
+      return allRows
+    },s.allRows)
+    return tick(s, {allRows: newArray})
+  }
+
+  const checkFullRows = (allRows: ReadonlyArray<ReadonlyArray<boolean>>) => {
+    const rowToClear = allRows.some(row => row.every(element => element))
+    if(rowToClear){
+      const allRowsIndex = allRows.map((row, index) => {
+        if(row.every(el => el)){
+          return index
+        }
+        return null
+      })
+      return allRowsIndex.filter(index => index)
+    }
+    return null
+  }
+
+  const clearRow = (s: State, indexRow: (number | null)[] | null) => {
+    if(indexRow){
+      const state = indexRow.reduce((accS,row) => {
+        if(row){
+          const clearBlocks = accS.blocks.filter(block => block.y !== row * block.height)
+          const allRows = s.allRows.map((column,cIndex) => {
+             const cRet = column.map((r, rIndex) => {
+              if(cIndex === row){
+                return false
+              }
+              else{
+                return s.allRows[cIndex][rIndex]
+              }})
+              console.log(cRet)
+              return cRet
+            })
+          return tick(s, {blocks: clearBlocks, allRows: allRows})
+        }
+        return accS
+      },s)
+      // console.log(state)
+      return state
+    }
+    // console.log(s)
+    return s
+    }
+ 
+  const addBlockToRow = (s: State, block: Block) => {
+    const blocks = s.blocks.filter(blocks => blocks.id != block.id)
+    const newBlock = createBlock(block, {addBlockToRow: true})
+    return tick(s, {blocks: [...blocks, newBlock]})
+  }
+
   const checkGameEnds = (blocks: Block[]) => {
     if(blocks.length){
       const flags = blocks.map(block => {
@@ -282,12 +346,18 @@ export function main() {
           //then check if y-coor can be updated successfully
           //and update the state
           const validMove =  checkYValid(newMovedCurrentBlock,s)
-          return stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
+          s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
+          s = addBlockRowForClear(s)
+          const rowToClear = checkFullRows(s.allRows)
+          return clearRow(s,rowToClear)
         }
         else{
           //this means that x-coor is updated successfully
           const validMove = checkYValid(moveCurrentBlock,s)
-          return stateMoveHandling(s, validMove, moveCurrentBlock, currentBlocks, previousBlock)
+          s = stateMoveHandling(s, validMove, moveCurrentBlock, currentBlocks, previousBlock)
+          s = addBlockRowForClear(s)
+          const rowToClear = checkFullRows(s.allRows)
+          return clearRow(s,rowToClear)
         }
       },initialState)
     ).subscribe((s:State) => {

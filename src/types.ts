@@ -1,5 +1,5 @@
 export { Constants, Viewport}
-export type { ObjectId, Block as Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue}
+export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows}
 /** Constants */
 const Viewport = {
   CANVAS_WIDTH: 200,
@@ -18,7 +18,7 @@ const Constants = {
 /**
  * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
  */
-type ObjectId = Readonly<{ id: String, parentId: String}>
+type ObjectId = Readonly<{ id: number, parentId: String}>
 
 interface IBlock extends ObjectId{
   width: number,
@@ -27,7 +27,7 @@ interface IBlock extends ObjectId{
   y: number,
   placed: boolean,
   style: String,
-  class: String
+  class: String,
 }
 
 type Block = Readonly<IBlock>
@@ -41,12 +41,18 @@ type Event = "keydown" | "keyup" | "keypress";
 
 /** State processing */
 
+type Rows = Readonly<{
+  id: number,
+  blocksInRow: ReadonlyArray<number>
+}>
+
 type State = Readonly<{
   gameEnd: boolean;
   score: number;
   blocks: ReadonlyArray<Block>;
   bigBlockCount: number;
   blockCount: number;
+  allRows: ReadonlyArray<ReadonlyArray<boolean>>
 }>;
 
 type StateProperty = keyof State; //it will be a union type of State's properties, in this case, "gameEnd" | "score" | "blocks" | "blockCount"
@@ -64,3 +70,7 @@ type KArgumentBlock<T extends BlockProperty> = {
 }
 
 type KeyPressValue = "+X" | "-X" | "+Y" | "NULL"
+
+// type AllRowsProperty = keyof AllRows
+// type AllRowsPropertyValue<T extends AllRowsProperty> = AllRows[T]
+// type 

@@ -6,7 +6,8 @@ const initialState: State = {
     score: 0,
     blocks: [],
     bigBlockCount: 0,
-    blockCount: 0
+    blockCount: 0,
+    allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))
   } as const;
 
 /**
@@ -35,9 +36,10 @@ const createBlock = <T extends BlockProperty> (block: Block, k: KArgumentBlock<T
   }
 }
 
+
 const createInitialBlock = (s:State, colour: String, x: number, y: number, id: number = 0): Block => {
   const block: Block = { 
-    id: `${id}`,
+    id: id,
     parentId: `${s.bigBlockCount}`,
     x: x,
     y: y,
