@@ -139,7 +139,7 @@ export function main() {
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
 
-  const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ) => {
+  const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ): {blocks: Block[], operator: string} => {
     //pre move the blocks in a one big block
     const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
         //check which key has been inputted, and change the x value 
@@ -158,9 +158,9 @@ export function main() {
         return altBlock
     })
     if(operator === "W"){
-      return preRotate(altCurrentBlocks)
+      return {blocks: preRotate(altCurrentBlocks), operator: operator}
     }
-    return altCurrentBlocks
+    return {blocks: altCurrentBlocks, operator: operator}
   }
 
   const checkYValid = (blocks: Block[], s: State): boolean => {
@@ -219,7 +219,8 @@ export function main() {
       return reduceUtil(leftRightFlag,false)
     })
     //if one block in a big block has invalid move, all blocks have invalid moves
-    return reduceUtil(leftRightFlags,false)
+    const result = reduceUtil(leftRightFlags,false)
+    return result
   }
 
   const stateMoveHandling = (s: State, ableToMove: boolean, blocks: Block[], currentBlocks: Block[], previousBlock: Block[]) => {
@@ -278,7 +279,7 @@ export function main() {
     if(indexRow && indexRow.length){
       const state = indexRow.reduce((accS,row) => {
         if(row){
-          const clearBlocks = accS.blocks.filter(block => block.y < row * CBlock.HEIGHT)
+          const clearBlocks = accS.blocks.filter(block => block.y < row * CBlock.HEIGHT || block.y > row * CBlock.HEIGHT)
           const shiftedBlocks = shiftBlockAfterClear(clearBlocks,row)
           if(shiftedBlocks){
             return tick(s, {blocks: shiftedBlocks, allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))})
@@ -296,10 +297,10 @@ export function main() {
 
   const shiftBlockAfterClear = (blocks: Block[], indexRow: number | null) => {
     if(indexRow){
-      console.log(indexRow)
       const newBlocks = blocks.map(block => {
+        const multiplier = ((Constants.GRID_HEIGHT - 1) - indexRow) + 1
         if(indexRow && block.y < indexRow * CBlock.HEIGHT){
-          return createBlock(block, {y: block.y + CBlock.HEIGHT})
+          return createBlock(block, {y: block.y + CBlock.HEIGHT * multiplier})
         }
         return block
       })
@@ -323,7 +324,12 @@ export function main() {
 
   const preRotate = (blocks: Block[]) => {
     const pivot = blocks[0] //take the first point as the pivot of rotation
+    
     const preRotatedBlocks = blocks.map(block => {
+      if(block.id == pivot.id){
+        return block
+      }
+
       const onLeftPivot = block.x < pivot.x
       const onRightPivot = block.x > pivot.x
       const onTopPivot = block.y < pivot.y
@@ -333,20 +339,25 @@ export function main() {
         return createBlock(block, {x: block.x + x, y: block.y + y})
 
       }
-      if(block.id == pivot.id){
-        return block
-      }
-      else if(onLeftPivot && !onRightPivot && !onTopPivot && !onBottomPivot){
-        return preRotateBlock(block, CBlock.WIDTH, -CBlock.HEIGHT)
+      const distanceX = (Math.abs(pivot.x - block.x) / CBlock.WIDTH)
+      const distanceY = (Math.abs(pivot.y - block.y) / CBlock.HEIGHT)
+
+      const multiplier = distanceX > distanceY ? distanceX : distanceY
+
+      const blockWidth = CBlock.WIDTH * multiplier
+      const blockHeight = CBlock.HEIGHT * multiplier
+
+      if(onLeftPivot && !onRightPivot && !onTopPivot && !onBottomPivot){
+        return preRotateBlock(block, blockWidth, -blockHeight)
       }
       else if(!onLeftPivot && onRightPivot && !onTopPivot && !onBottomPivot){
-        return preRotateBlock(block, -CBlock.WIDTH, CBlock.HEIGHT)
+        return preRotateBlock(block, -blockWidth, blockHeight)
       }
       else if(!onLeftPivot && !onRightPivot && onTopPivot && !onBottomPivot){
-        return preRotateBlock(block, CBlock.WIDTH, CBlock.HEIGHT)
+        return preRotateBlock(block, blockWidth, blockHeight)
       }
       else if(!onLeftPivot && !onRightPivot && !onTopPivot && onBottomPivot){
-        return preRotateBlock(block, -CBlock.WIDTH, -CBlock.HEIGHT)
+        return preRotateBlock(block, -blockWidth, -blockHeight)
       } 
       else if(onLeftPivot && !onRightPivot && onTopPivot && !onBottomPivot){
         const newBlock = preRotateBlock(block, CBlock.WIDTH, -CBlock.HEIGHT)
@@ -369,8 +380,6 @@ export function main() {
     return preRotatedBlocks 
   }
 
-  // const rotateValid = ()
-
   const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$).pipe(
       scan((s:State,value) => {
         //take out the block that has not been placed yet (the player still can move these blocks)
@@ -381,8 +390,8 @@ export function main() {
         //if the current game state does not have any blocks that is not placed, we would like to create some new ones
         if(!currentBlocks.length){
           // const block = create22square(s)
-          // const block = tBlock(s)
-          const block = skewBlock(s)
+          const block = tBlock(s)
+          // const block = skewBlock(s)
           return tick(s,{blocks: [...s.blocks,...block], 
             blockCount: s.blockCount + block.length, 
             bigBlockCount: s.bigBlockCount + 1})
@@ -395,23 +404,25 @@ export function main() {
         //the only check if y-coor can be updated successfully
 
         //if it cant be updated successfully
-        if(!checkLeftRight(s,moveCurrentBlock)){
+        if(!checkLeftRight(s,moveCurrentBlock.blocks)){
           //we copy the pre-moved blocks and change their x-coor to original coor
-          const newMovedCurrentBlock = moveCurrentBlock.map(((block, index) => {
+          const newMovedCurrentBlock = moveCurrentBlock.blocks.map(((block, index) => {
             return createBlock(block,{x: currentBlocks[index].x})
           }))
           //then check if y-coor can be updated successfully
           //and update the state
-          const validMove =  checkYValid(newMovedCurrentBlock,s)
-          s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
+          if(moveCurrentBlock.operator !== "W"){
+            const validMove =  checkYValid(newMovedCurrentBlock,s)
+            s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
+          }          
           s = addBlockRowForClear(s)
           const rowToClear = checkFullRows(s.allRows)
           return clearRow(s,rowToClear)
         }
         else{
           //this means that x-coor is updated successfully
-          const validMove = checkYValid(moveCurrentBlock,s)
-          s = stateMoveHandling(s, validMove, moveCurrentBlock, currentBlocks, previousBlock)
+          const validMove = checkYValid(moveCurrentBlock.blocks,s)
+          s = stateMoveHandling(s, validMove, moveCurrentBlock.blocks, currentBlocks, previousBlock)
           s = addBlockRowForClear(s)
           const rowToClear = checkFullRows(s.allRows)
           return clearRow(s,rowToClear)
