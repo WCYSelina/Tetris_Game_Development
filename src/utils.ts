@@ -1,5 +1,5 @@
 export {reduceUtil as findNotValidMove, findTopEdgePos, findRightEdgePos}
-import { Block} from "./types"
+import {Block, CBlock} from "./types"
 
 
 const reduceUtil = (isTouched: boolean[], typeTrue: boolean) => isTouched.reduce((flag,current) => {
@@ -10,10 +10,10 @@ const reduceUtil = (isTouched: boolean[], typeTrue: boolean) => isTouched.reduce
 })
 
 const findTopEdgePos = (block: Block) => {
-    return block.y - block.height
+    return block.y - CBlock.HEIGHT
 }
 
 const findRightEdgePos = (block: Block) => {
-    return block.x + block.width
+    return block.x + CBlock.WIDTH
 }
 

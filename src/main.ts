@@ -15,8 +15,8 @@
 import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
 import { map, filter, scan, switchMap, reduce } from "rxjs/operators";
-import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows} from './types'
-import { initialState, createState as tick, createBlock, create22square } from './state'
+import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows, CBlock} from './types'
+import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock} from './state'
 import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from "./utils";
 /** Rendering (side effects) */
 
@@ -96,6 +96,7 @@ export function main() {
   const left$ = fromKey("KeyA", "-X");
   const right$ = fromKey("KeyD", "+X");
   const down$ = fromKey("KeyS", "+Y" );
+  const rotate$ = fromKey("KeyW", "W")
 
   /** Observables */
 
@@ -144,18 +145,21 @@ export function main() {
         //check which key has been inputted, and change the x value 
         const findX = (operator: string | null)  => {
             if(operator === "+X"){
-              return currentBlock.x + currentBlock.width
+              return currentBlock.x + CBlock.WIDTH
             }
             else{
-              return currentBlock.x - currentBlock.width
+              return currentBlock.x - CBlock.WIDTH
             }
         }
         //only change the x-coor when the key left and right is pressed
         const x = operator === "+X" || operator === "-X" ? findX(operator) : currentBlock.x
-        const altBlock = createBlock(currentBlock, {x: x, y: currentBlock.y + currentBlock.width})
+        const altBlock = createBlock(currentBlock, {x: x, y: currentBlock.y + CBlock.HEIGHT})
         
         return altBlock
     })
+    if(operator === "W"){
+      return preRotate(altCurrentBlocks)
+    }
     return altCurrentBlocks
   }
 
@@ -163,7 +167,7 @@ export function main() {
     const minYs = blocks.map( block => {
       const reachBoundaryY = () => {
         //check if the block touches boundary
-        const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - block.height
+        const BOTTOM_BOUNDARY =  Viewport.CANVAS_HEIGHT - CBlock.HEIGHT
         return block.y > BOTTOM_BOUNDARY ? false : true
       }
       const newBlocks = s.blocks.map(eBlock => {
@@ -192,7 +196,7 @@ export function main() {
       const reachBoundaryX = () => {
         //check if the block touches boundary
         const LEFT_BOUNDARY = 0
-        const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - block.width
+        const RIGHT_BOUNDARY = Viewport.CANVAS_WIDTH - CBlock.WIDTH
         return block.x < LEFT_BOUNDARY || block.x > RIGHT_BOUNDARY ? false : true
       }
       const leftRightFlag = s.blocks.map(eBlock => {
@@ -239,10 +243,10 @@ export function main() {
   const addBlockRowForClear = (s: State) => {
     const placeBlocks = s.blocks.filter(block => block.placed)
     const newArray = placeBlocks.reduce((allRows, block) => {
-      if(allRows[block.y/block.height][block.x/block.width] === false){
+      if(allRows[block.y/CBlock.HEIGHT][block.x/CBlock.WIDTH] === false){
         const row = allRows.map((row,cIndex) => {
           const column = row.map((column,rIndex) => {
-            if(cIndex === block.y/block.height && rIndex === block.x/block.width){
+            if(cIndex === block.y/CBlock.HEIGHT && rIndex === block.x/CBlock.WIDTH){
               return true
             }
             return allRows[cIndex][rIndex]
@@ -274,35 +278,28 @@ export function main() {
     if(indexRow && indexRow.length){
       const state = indexRow.reduce((accS,row) => {
         if(row){
-          const clearBlocks = accS.blocks.filter(block => block.y < row * block.height)
+          const clearBlocks = accS.blocks.filter(block => block.y < row * CBlock.HEIGHT)
           const shiftedBlocks = shiftBlockAfterClear(clearBlocks,row)
           if(shiftedBlocks){
-            console.log("heyyy")
             return tick(s, {blocks: shiftedBlocks, allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))})
           }
           else{
-            console.log
             return tick(s, {blocks: clearBlocks, allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))})
-          }
-          
+          }  
         }
         return accS
       },s)
-      console.log(state)
       return state
     }
     return s
   }
 
   const shiftBlockAfterClear = (blocks: Block[], indexRow: number | null) => {
-    console.log("block")
-    console.log(blocks)
-    console.log("block")
     if(indexRow){
       console.log(indexRow)
       const newBlocks = blocks.map(block => {
-        if(indexRow && block.y < indexRow * block.height){
-          return createBlock(block, {y: block.y + block.height})
+        if(indexRow && block.y < indexRow * CBlock.HEIGHT){
+          return createBlock(block, {y: block.y + CBlock.HEIGHT})
         }
         return block
       })
@@ -324,7 +321,57 @@ export function main() {
     return false
   }
 
-  const source$: Subscription = merge(tickWithX$,left$,right$,down$).pipe(
+  const preRotate = (blocks: Block[]) => {
+    const pivot = blocks[0] //take the first point as the pivot of rotation
+    const preRotatedBlocks = blocks.map(block => {
+      const onLeftPivot = block.x < pivot.x
+      const onRightPivot = block.x > pivot.x
+      const onTopPivot = block.y < pivot.y
+      const onBottomPivot = block.y > pivot.y
+
+      const preRotateBlock = (block: Block, x: number, y: number) => {
+        return createBlock(block, {x: block.x + x, y: block.y + y})
+
+      }
+      if(block.id == pivot.id){
+        return block
+      }
+      else if(onLeftPivot && !onRightPivot && !onTopPivot && !onBottomPivot){
+        return preRotateBlock(block, CBlock.WIDTH, -CBlock.HEIGHT)
+      }
+      else if(!onLeftPivot && onRightPivot && !onTopPivot && !onBottomPivot){
+        return preRotateBlock(block, -CBlock.WIDTH, CBlock.HEIGHT)
+      }
+      else if(!onLeftPivot && !onRightPivot && onTopPivot && !onBottomPivot){
+        return preRotateBlock(block, CBlock.WIDTH, CBlock.HEIGHT)
+      }
+      else if(!onLeftPivot && !onRightPivot && !onTopPivot && onBottomPivot){
+        return preRotateBlock(block, -CBlock.WIDTH, -CBlock.HEIGHT)
+      } 
+      else if(onLeftPivot && !onRightPivot && onTopPivot && !onBottomPivot){
+        const newBlock = preRotateBlock(block, CBlock.WIDTH, -CBlock.HEIGHT)
+        return preRotateBlock(newBlock, CBlock.WIDTH, CBlock.HEIGHT)
+      }
+      else if(onLeftPivot && !onRightPivot && !onTopPivot && onBottomPivot){
+        const newBlock = preRotateBlock(block, CBlock.WIDTH, -CBlock.HEIGHT)
+        return preRotateBlock(newBlock, -CBlock.WIDTH, -CBlock.HEIGHT)
+      }
+      else if(!onLeftPivot && onRightPivot && onTopPivot && !onBottomPivot){
+        const newBlock = preRotateBlock(block, -CBlock.WIDTH, CBlock.HEIGHT)
+        return preRotateBlock(newBlock, CBlock.WIDTH, CBlock.HEIGHT)
+      }
+      else if(!onLeftPivot && onRightPivot && !onTopPivot && onBottomPivot){
+        const newBlock = preRotateBlock(block, -CBlock.WIDTH, CBlock.HEIGHT)
+        return preRotateBlock(newBlock, -CBlock.WIDTH, -CBlock.HEIGHT)
+      } 
+      return block
+    })
+    return preRotatedBlocks 
+  }
+
+  // const rotateValid = ()
+
+  const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$).pipe(
       scan((s:State,value) => {
         //take out the block that has not been placed yet (the player still can move these blocks)
         const currentBlocks = s.blocks.filter(block => !block.placed)
@@ -333,7 +380,9 @@ export function main() {
 
         //if the current game state does not have any blocks that is not placed, we would like to create some new ones
         if(!currentBlocks.length){
-          const block = create22square(s)
+          // const block = create22square(s)
+          // const block = tBlock(s)
+          const block = skewBlock(s)
           return tick(s,{blocks: [...s.blocks,...block], 
             blockCount: s.blockCount + block.length, 
             bigBlockCount: s.bigBlockCount + 1})

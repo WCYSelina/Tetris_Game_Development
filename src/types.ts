@@ -1,4 +1,4 @@
-export { Constants, Viewport}
+export { Constants, Viewport, CBlock}
 export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows}
 /** Constants */
 const Viewport = {
@@ -33,7 +33,7 @@ interface IBlock extends ObjectId{
 type Block = Readonly<IBlock>
 /** User input */
 
-type Key = "KeyS" | "KeyA" | "KeyD";
+type Key = "KeyS" | "KeyA" | "KeyD" | "KeyW";
 
 type Event = "keydown" | "keyup" | "keypress";
 
@@ -55,6 +55,11 @@ type State = Readonly<{
   allRows: ReadonlyArray<ReadonlyArray<boolean>>
 }>;
 
+const CBlock = {
+  WIDTH: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
+  HEIGHT: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+} as const;
+
 type StateProperty = keyof State; //it will be a union type of State's properties, in this case, "gameEnd" | "score" | "blocks" | "blockCount"
 type StatePropertyValue<T extends StateProperty> = State[T]; //State[T] retrives the type of T within the State type, for example, State["score"] will retrieve the type "number"
 type KArgumentState<T extends StateProperty> = {
@@ -69,7 +74,7 @@ type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
 
-type KeyPressValue = "+X" | "-X" | "+Y" | "NULL"
+type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
 
 // type AllRowsProperty = keyof AllRows
 // type AllRowsPropertyValue<T extends AllRowsProperty> = AllRows[T]

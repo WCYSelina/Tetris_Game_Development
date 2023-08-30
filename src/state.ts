@@ -1,5 +1,5 @@
-export{ initialState, tick as createState, createBlock, create22square, createInitialBlock }
-import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block} from './types'
+export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock}
+import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block, CBlock} from './types'
 
 const initialState: State = {
     gameEnd: false,
@@ -43,8 +43,8 @@ const createInitialBlock = (s:State, colour: String, x: number, y: number, id: n
     parentId: `${s.bigBlockCount}`,
     x: x,
     y: y,
-    width: Viewport.CANVAS_WIDTH / Constants.GRID_WIDTH,
-    height: Viewport.CANVAS_HEIGHT / Constants.GRID_HEIGHT,
+    width: CBlock.WIDTH,
+    height: CBlock.HEIGHT,
     placed: false,
     style: `fill: ${colour}`,
     class: "block"
@@ -54,10 +54,37 @@ const createInitialBlock = (s:State, colour: String, x: number, y: number, id: n
 
 const create22square = (s:State): Block[] => {
   const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1) 
-  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,0, s.blockCount + 2)
-  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - block1.width,block2.y+block2.height, s.blockCount + 3)
-  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,block2.y+block2.height, s.blockCount + 4)
+  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH,0, s.blockCount + 2)
+  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, block2.y + CBlock.HEIGHT, s.blockCount + 3)
+  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,block2.y + CBlock.HEIGHT, s.blockCount + 4)
   
+  return [block1, block2, block3, block4]
+}
+
+const tBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"purple",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, 0, s.blockCount + 1)
+  const block2 = createInitialBlock(s,"purple",Viewport.CANVAS_WIDTH/2, 0, s.blockCount + 2)
+  const block3 = createInitialBlock(s,"purple",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3)
+  const block4 = createInitialBlock(s,"purple",Viewport.CANVAS_WIDTH/2, block2.y + CBlock.HEIGHT, s.blockCount + 4)
+
+  return [block1, block2, block3, block4]
+}
+
+const straightBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1) 
+  const block2 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH,0, s.blockCount + 2)
+  const block3 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3)
+  const block4 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH * 2,0, s.blockCount + 4)
+
+  return [block1, block2, block3, block4]
+}
+
+const skewBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1) 
+  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,CBlock.HEIGHT, s.blockCount + 2)
+  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3)
+  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, CBlock.HEIGHT, s.blockCount + 4)
+
   return [block1, block2, block3, block4]
 }
 
