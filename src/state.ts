@@ -3,7 +3,7 @@ import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Vie
 
 const initialState: State = {
     gameEnd: false,
-    score: 190,
+    score: 0,
     blocks: [],
     bigBlockCount: 0,
     blockCount: 0,

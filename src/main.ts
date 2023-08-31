@@ -97,6 +97,7 @@ export function main() {
     HTMLElement;
   const restart = document.querySelector("#restart") as SVGGraphicsElement &
     HTMLElement;
+  const instantReplay = document.querySelector("#instantReplay") as HTMLElement;
   const container = document.querySelector("#main") as HTMLElement;
 
   svg.setAttribute("height", `${Viewport.CANVAS_HEIGHT}`);
@@ -125,7 +126,8 @@ export function main() {
   const right$ = fromKey("KeyD", "+X");
   const down$ = fromKey("KeyS", "+Y");
   const rotate$ = fromKey("KeyW", "W");
-  const moveClick$ = fromEvent<MouseEvent>(restart, "click");
+  const restartClick$ = fromEvent<MouseEvent>(restart, "click");
+  const instantRestartClick$ = fromEvent<MouseEvent>(instantReplay, "click");
 
   /** Observables */
 
@@ -419,7 +421,9 @@ export function main() {
 
   const preRotate = (blocks: Block[]) => {
     const pivot = blocks[0]; //take the first point as the pivot of rotation
-
+    if(typeof pivot !== "undefined" && pivot.type === "square"){
+      return blocks
+    }
     const preRotatedBlocks = blocks.map((block) => {
       if (block.id == pivot.id) {
         return block;
@@ -502,12 +506,13 @@ export function main() {
     right$,
     down$,
     rotate$,
-    moveClick$
+    restartClick$,
+    instantRestartClick$
   )
     .pipe(
       scan((s: State, value) => {
         if(Math.floor(s.score/1000) <= 10){
-          s = tick(s, {level: Math.floor(s.score/100)})
+          s = tick(s, {level: Math.floor(s.score/1000)})
         }
         if (s.blackBlockCount !== (s.level - 1) * Constants.GRID_WIDTH) {
           const rowBlackBlock = createRange(1, s.level - 1);

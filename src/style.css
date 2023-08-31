@@ -104,3 +104,10 @@ svg rect {
   font-weight: bolder;
   text-align: center;
 }
+
+#instantReplay{
+  font-size: 1.3em;
+  font-weight: bolder;
+  text-align: center;
+  color: blue;
+}
