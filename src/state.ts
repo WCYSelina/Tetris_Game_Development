@@ -3,14 +3,15 @@ import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Vie
 
 const initialState: State = {
     gameEnd: false,
-    score: 0,
+    score: 190,
     blocks: [],
     bigBlockCount: 0,
     blockCount: 0,
     blackBlockCount: 0,
     allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false)),
     nextShape: null,
-    level: 1
+    level: 0,
+    highScore: 0
   } as const;
 
 /**
@@ -65,7 +66,7 @@ const createBlackBlock = (s: State, x:number, y:number) => {
     width: CBlock.WIDTH,
     height: CBlock.HEIGHT,
     placed: true,
-    style: "fill: black",
+    style: "fill: grey",
     class: "block",
     type: "null"
   }

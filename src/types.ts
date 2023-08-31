@@ -57,6 +57,7 @@ type State = Readonly<{
   allRows: ReadonlyArray<ReadonlyArray<boolean>>;
   nextShape: Block[] | null;
   level: number
+  highScore: number
 }>;
 
 const CBlock = {
