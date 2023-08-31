@@ -53,8 +53,10 @@ type State = Readonly<{
   blocks: ReadonlyArray<Block>;
   bigBlockCount: number;
   blockCount: number;
+  blackBlockCount: number
   allRows: ReadonlyArray<ReadonlyArray<boolean>>;
-  nextShape: Block[] | null
+  nextShape: Block[] | null;
+  level: number
 }>;
 
 const CBlock = {

@@ -16,8 +16,8 @@ import "./style.css";
 import { fromEvent, interval, merge, Subscription, Observable, zip} from "rxjs";
 import { map, filter, scan, switchMap, reduce, max } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows, CBlock} from './types'
-import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock} from './state'
-import { findRightEdgePos, findTopEdgePos, reduceUtil, RNG} from "./utils";
+import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock, createBlackBlock} from './state'
+import { findRightEdgePos, findTopEdgePos, reduceUtil} from "./utils";
 /** Rendering (side effects) */
 
 /**
@@ -25,7 +25,6 @@ import { findRightEdgePos, findTopEdgePos, reduceUtil, RNG} from "./utils";
  * @param elem SVG element to display
  */
 const show = (elem: SVGGraphicsElement) => {
-  console.log(elem)
   elem.setAttribute("visibility", "visible");
   elem.parentNode!.appendChild(elem);
 };
@@ -160,7 +159,7 @@ export function main() {
     map(() => ({ x: "NULL" } as { x: KeyPressValue}))
   );
 
-  const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ): {blocks: Block[], operator: string} => {
+  const moveBlock = (s:State, currentBlocks: Block[], operator: KeyPressValue ): Block[] => {
     //pre move the blocks in a one big block
     const altCurrentBlocks = currentBlocks.map ((currentBlock) => {
         //check which key has been inputted, and change the x value 
@@ -178,10 +177,10 @@ export function main() {
         
         return altBlock
     })
-    if(operator === "W" && currentBlocks[0].type != "square"){
-      return {blocks: preRotate(altCurrentBlocks), operator: operator}
-    }
-    return {blocks: altCurrentBlocks, operator: operator}
+    // if(operator === "W" && currentBlocks[0].type != "square"){
+    //   return {blocks: preRotate(altCurrentBlocks), operator: operator}
+    // }
+    return altCurrentBlocks
   }
 
   const checkYValid = (blocks: Block[], s: State): boolean => {
@@ -248,7 +247,7 @@ export function main() {
     //if y is a valid move, we just update the game state of the blocks property with the blocks that passed into this function
     //if it cant be moved, we used back the blocks that at the start of this tick, but just change the placed property to true,
     //so that the blocks are finalised
-    if(ableToMove){
+    if(ableToMove ){
       return tick(s,{blocks: [...previousBlock,...blocks]})
     }
     else{
@@ -265,7 +264,7 @@ export function main() {
   const addBlockRowForClear = (s: State) => {
     const placeBlocks = s.blocks.filter(block => block.placed)
     const newArray = placeBlocks.reduce((allRows, block) => {
-      if(allRows[block.y/CBlock.HEIGHT][block.x/CBlock.WIDTH] === false){
+      if(block.parentId !== "null" && allRows[block.y/CBlock.HEIGHT][block.x/CBlock.WIDTH] === false){
         const row = allRows.map((row,cIndex) => {
           const column = row.map((column,rIndex) => {
             if(cIndex === block.y/CBlock.HEIGHT && rIndex === block.x/CBlock.WIDTH){
@@ -403,13 +402,46 @@ export function main() {
   const spawnRandomBlocks = (s: State) => {
     const creationBlocks = [create22square,tBlock,skewBlock,straightBlock]
     const randomIndex = Math.floor(Math.random() * creationBlocks.length)
-    const blocks = creationBlocks[randomIndex](s)
+    const blocks = creationBlocks[3](s)
 
     return tick(s, {nextShape: blocks})
   }
 
+  const createRange = (start: number, end: number): number[] => {
+    if(start > end){
+      return []
+    }
+    return [start,...createRange(start+1, end)]
+  }
+
+  const checkAllValid = (s: State, moveCurrentBlock: Block[], currentBlocks: Block[], operator: string) => {
+    const previousBlock =  s.blocks.filter(block => block.placed)
+    return tick(s,{blocks: [...previousBlock,...moveCurrentBlock]})
+
+  }
   const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$,moveClick$).pipe(
       scan((s:State, value) => {
+        if(s.blackBlockCount !== (s.level-1) * Constants.GRID_WIDTH){
+          const rowBlackBlock = createRange(1,s.level - 1)
+          const columnBlackBlock = createRange(0,Constants.GRID_WIDTH-1)
+
+          const blackBlocks = rowBlackBlock.map(row => {
+            const blackBlock = columnBlackBlock.map(column => {
+              const blackBlock = createBlackBlock(s,column*CBlock.WIDTH,(Constants.GRID_HEIGHT - row)*CBlock.HEIGHT)
+              return blackBlock
+            })
+            return blackBlock
+          })
+          if(blackBlocks.length){
+            const state = blackBlocks.reduce((acc,blocks) => {
+              return blocks.reduce((acc, block) => {
+                return tick(acc, {blocks: [...acc.blocks, block], blackBlockCount: acc.blackBlockCount + 1})
+              },acc)
+            },s)
+            s = state
+          }
+        }
+        
         if(!s.gameEnd){
           if(!s.nextShape){
             return spawnRandomBlocks(s)
@@ -418,7 +450,7 @@ export function main() {
           //take out the block that has not been placed yet (the player still can move these blocks)
           const currentBlocks = s.blocks.filter(block => !block.placed)
           //take out the block that has been placed (the player can't move these blocks anymore)
-          const previousBlock =  s.blocks.filter(block => block.placed)
+          
   
           //if the current game state does not have any blocks that is not placed, we would like to create some new ones
           if(!currentBlocks.length){
@@ -433,40 +465,47 @@ export function main() {
           if (value instanceof MouseEvent) {
             return initialState; // Reset state on mouse click
           }
+
+          //pre-rotate the blocks
+          if(value.x === "W"){
+            const rotatedCurrentBlocks = preRotate(currentBlocks)
+            if(checkLeftRight(s,rotatedCurrentBlocks) && checkYValid(rotatedCurrentBlocks,s)){
+              s = checkAllValid(s,rotatedCurrentBlocks,currentBlocks,value.x) 
+            }
+            else{
+              s = checkAllValid(s,currentBlocks,currentBlocks,value.x) 
+            }
+          }
+
+          const newCurrentBlock = s.blocks.filter(block => !block.placed)
+          const previousBlock = s.blocks.filter(block => block.placed)
+
           //pre-move the blocks
-          const moveCurrentBlock = moveBlock(s, currentBlocks, value.x)
+          const moveCurrentBlock = moveBlock(s, newCurrentBlock, value.x)
+          if(checkLeftRight(s,moveCurrentBlock) && checkYValid(moveCurrentBlock,s)){
+            s = checkAllValid(s,moveCurrentBlock,currentBlocks,value.x) 
+          }
+          else{
+            s = checkAllValid(s,newCurrentBlock,currentBlocks,value.x) 
+            const newBlocks = newCurrentBlock.map(block => {
+              return createBlock(block, {placed: true})
+            })
+            console.log("ssss")
+            s =  tick(s, {blocks: [...previousBlock, ...newBlocks]})
+            return s
+          }
+          
 
           //first check if x-coor can be updated successfully
           //the only check if y-coor can be updated successfully
 
           //if it cant be updated successfully
-          if(!checkLeftRight(s,moveCurrentBlock.blocks)){
-            //we copy the pre-moved blocks and change their x-coor to original coor
-            const newMovedCurrentBlock = moveCurrentBlock.blocks.map(((block, index) => {
-              return createBlock(block,{x: currentBlocks[index].x})
-            }))
-            //then check if y-coor can be updated successfully
-            //and update the state
-            if(moveCurrentBlock.operator !== "W"){
-              const validMove =  checkYValid(newMovedCurrentBlock,s)
-              s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
-            }          
-            s = addBlockRowForClear(s)
-            const rowToClear = checkFullRows(s.allRows)
-            return clearRow(s,rowToClear)
-          }
-          else{
-            //this means that x-coor is updated successfully
-            const validMove = checkYValid(moveCurrentBlock.blocks,s)
-            s = stateMoveHandling(s, validMove, moveCurrentBlock.blocks, currentBlocks, previousBlock)
-            s = addBlockRowForClear(s)
-            const rowToClear = checkFullRows(s.allRows)
-            return clearRow(s,rowToClear)
-          }
+          
         }
         if (value instanceof MouseEvent) {
           return initialState; // Reset state on mouse click
         }
+        console.log(s)
         return s 
       },initialState)
     ).subscribe((s:State) => {

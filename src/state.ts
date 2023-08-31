@@ -1,4 +1,4 @@
-export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock}
+export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock, createBlackBlock}
 import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block, CBlock} from './types'
 
 const initialState: State = {
@@ -7,8 +7,10 @@ const initialState: State = {
     blocks: [],
     bigBlockCount: 0,
     blockCount: 0,
+    blackBlockCount: 0,
     allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false)),
     nextShape: null,
+    level: 1
   } as const;
 
 /**
@@ -52,6 +54,21 @@ const createInitialBlock = (s:State, colour: String, x: number, y: number, id: n
     type: `${type}`
   }
   return block
+}
+
+const createBlackBlock = (s: State, x:number, y:number) => {
+  return{
+    id: -1,
+    parentId:"null",
+    x: x,
+    y: y,
+    width: CBlock.WIDTH,
+    height: CBlock.HEIGHT,
+    placed: true,
+    style: "fill: black",
+    class: "block",
+    type: "null"
+  }
 }
 
 const create22square = (s:State): Block[] => {
