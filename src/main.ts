@@ -13,11 +13,11 @@
  */
 
 import "./style.css";
-import { fromEvent, interval, merge, Subscription} from "rxjs";
+import { fromEvent, interval, merge, Subscription, Observable, zip} from "rxjs";
 import { map, filter, scan, switchMap, reduce, max } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows, CBlock} from './types'
 import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock} from './state'
-import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from "./utils";
+import { findRightEdgePos, findTopEdgePos, reduceUtil, RNG} from "./utils";
 /** Rendering (side effects) */
 
 /**
@@ -25,6 +25,7 @@ import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from
  * @param elem SVG element to display
  */
 const show = (elem: SVGGraphicsElement) => {
+  console.log(elem)
   elem.setAttribute("visibility", "visible");
   elem.parentNode!.appendChild(elem);
 };
@@ -69,6 +70,8 @@ export function main() {
     HTMLElement;
   const gameover = document.querySelector("#gameOver") as SVGGraphicsElement &
     HTMLElement;
+  const restart = document.querySelector("#restart") as SVGGraphicsElement &
+  HTMLElement;
   const container = document.querySelector("#main") as HTMLElement;
 
   svg.setAttribute("height", `${Viewport.CANVAS_HEIGHT}`);
@@ -97,6 +100,7 @@ export function main() {
   const right$ = fromKey("KeyD", "+X");
   const down$ = fromKey("KeyS", "+Y" );
   const rotate$ = fromKey("KeyW", "W")
+  const moveClick$ = fromEvent<MouseEvent>(restart,"click")
 
   /** Observables */
 
@@ -132,7 +136,24 @@ export function main() {
         svg.appendChild(cube)
       }
     });
-    }
+    const previewBox = preview.querySelectorAll(".block")
+    previewBox.forEach(block => {preview.removeChild(block)})
+    if(s.nextShape){
+      s.nextShape.forEach(block => {
+        const cube = createSvgElement(svg.namespaceURI, "rect", {
+          id: `${block.id}`,
+          parentId: `${block.parentId}`,
+          x: `${block.x-CBlock.WIDTH}`,
+          y: `${block.y+CBlock.HEIGHT}`,
+          width: `${block.width}`,
+          height:  `${block.height}`,
+          placed: `${block.parentId}`,
+          style: `${block.style}`,
+          class: "block"
+        })
+        preview.appendChild(cube)
+      }) 
+    }}
 
   //in order to merge tick with the input keyboard stream, we need to map the same properties as the input keybord stream
   const tickWithX$ = tick$.pipe(
@@ -384,61 +405,78 @@ export function main() {
     const randomIndex = Math.floor(Math.random() * creationBlocks.length)
     const blocks = creationBlocks[randomIndex](s)
 
-    return tick(s,{blocks: [...s.blocks,...blocks], 
-      blockCount: s.blockCount + blocks.length, 
-      bigBlockCount: s.bigBlockCount + 1})
+    return tick(s, {nextShape: blocks})
   }
 
-  const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$).pipe(
-      scan((s:State,value) => {
-        //take out the block that has not been placed yet (the player still can move these blocks)
-        const currentBlocks = s.blocks.filter(block => !block.placed)
-        //take out the block that has been placed (the player can't move these blocks anymore)
-        const previousBlock =  s.blocks.filter(block => block.placed)
+  const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$,moveClick$).pipe(
+      scan((s:State, value) => {
+        if(!s.gameEnd){
+          if(!s.nextShape){
+            return spawnRandomBlocks(s)
+          }
+          
+          //take out the block that has not been placed yet (the player still can move these blocks)
+          const currentBlocks = s.blocks.filter(block => !block.placed)
+          //take out the block that has been placed (the player can't move these blocks anymore)
+          const previousBlock =  s.blocks.filter(block => block.placed)
+  
+          //if the current game state does not have any blocks that is not placed, we would like to create some new ones
+          if(!currentBlocks.length){
+            if(s.nextShape){
+              return tick(s,{blocks: [...s.blocks,...s.nextShape], 
+                blockCount: s.blockCount + s.nextShape.length, 
+                bigBlockCount: s.bigBlockCount + 1, nextShape: null})
+            }
+          }
+          
+          //since mouseClick$ does not have x value, we need to handle this situation
+          if (value instanceof MouseEvent) {
+            return initialState; // Reset state on mouse click
+          }
+          //pre-move the blocks
+          const moveCurrentBlock = moveBlock(s, currentBlocks, value.x)
 
-        //if the current game state does not have any blocks that is not placed, we would like to create some new ones
-        if(!currentBlocks.length){
-          return spawnRandomBlocks(s)
+          //first check if x-coor can be updated successfully
+          //the only check if y-coor can be updated successfully
+
+          //if it cant be updated successfully
+          if(!checkLeftRight(s,moveCurrentBlock.blocks)){
+            //we copy the pre-moved blocks and change their x-coor to original coor
+            const newMovedCurrentBlock = moveCurrentBlock.blocks.map(((block, index) => {
+              return createBlock(block,{x: currentBlocks[index].x})
+            }))
+            //then check if y-coor can be updated successfully
+            //and update the state
+            if(moveCurrentBlock.operator !== "W"){
+              const validMove =  checkYValid(newMovedCurrentBlock,s)
+              s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
+            }          
+            s = addBlockRowForClear(s)
+            const rowToClear = checkFullRows(s.allRows)
+            return clearRow(s,rowToClear)
+          }
+          else{
+            //this means that x-coor is updated successfully
+            const validMove = checkYValid(moveCurrentBlock.blocks,s)
+            s = stateMoveHandling(s, validMove, moveCurrentBlock.blocks, currentBlocks, previousBlock)
+            s = addBlockRowForClear(s)
+            const rowToClear = checkFullRows(s.allRows)
+            return clearRow(s,rowToClear)
+          }
         }
-
-        //pre-move the blocks
-        const moveCurrentBlock = moveBlock(s, currentBlocks, value.x)
-
-        //first check if x-coor can be updated successfully
-        //the only check if y-coor can be updated successfully
-
-        //if it cant be updated successfully
-        if(!checkLeftRight(s,moveCurrentBlock.blocks)){
-          //we copy the pre-moved blocks and change their x-coor to original coor
-          const newMovedCurrentBlock = moveCurrentBlock.blocks.map(((block, index) => {
-            return createBlock(block,{x: currentBlocks[index].x})
-          }))
-          //then check if y-coor can be updated successfully
-          //and update the state
-          if(moveCurrentBlock.operator !== "W"){
-            const validMove =  checkYValid(newMovedCurrentBlock,s)
-            s =  stateMoveHandling(s, validMove, newMovedCurrentBlock, currentBlocks, previousBlock)
-          }          
-          s = addBlockRowForClear(s)
-          const rowToClear = checkFullRows(s.allRows)
-          return clearRow(s,rowToClear)
+        if (value instanceof MouseEvent) {
+          return initialState; // Reset state on mouse click
         }
-        else{
-          //this means that x-coor is updated successfully
-          const validMove = checkYValid(moveCurrentBlock.blocks,s)
-          s = stateMoveHandling(s, validMove, moveCurrentBlock.blocks, currentBlocks, previousBlock)
-          s = addBlockRowForClear(s)
-          const rowToClear = checkFullRows(s.allRows)
-          return clearRow(s,rowToClear)
-        }
+        return s 
       },initialState)
     ).subscribe((s:State) => {
       render(s)
       if (s.gameEnd) {
         show(gameover);
-        source$.unsubscribe()
+        show(restart)
       } else {
         hide(gameover);
+        hide(restart)
       }
     }
     );

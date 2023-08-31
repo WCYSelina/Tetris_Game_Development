@@ -7,7 +7,8 @@ const initialState: State = {
     blocks: [],
     bigBlockCount: 0,
     blockCount: 0,
-    allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false))
+    allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false)),
+    nextShape: null,
   } as const;
 
 /**
