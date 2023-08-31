@@ -28,6 +28,7 @@ interface IBlock extends ObjectId{
   placed: boolean,
   style: String,
   class: String,
+  type: String,
 }
 
 type Block = Readonly<IBlock>

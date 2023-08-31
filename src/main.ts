@@ -14,7 +14,7 @@
 
 import "./style.css";
 import { fromEvent, interval, merge, Subscription} from "rxjs";
-import { map, filter, scan, switchMap, reduce } from "rxjs/operators";
+import { map, filter, scan, switchMap, reduce, max } from "rxjs/operators";
 import { Block, Key, Event, State, Viewport, Constants, KeyPressValue, Rows, CBlock} from './types'
 import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock} from './state'
 import { findRightEdgePos, findTopEdgePos, findNotValidMove as reduceUtil } from "./utils";
@@ -157,7 +157,7 @@ export function main() {
         
         return altBlock
     })
-    if(operator === "W"){
+    if(operator === "W" && currentBlocks[0].type != "square"){
       return {blocks: preRotate(altCurrentBlocks), operator: operator}
     }
     return {blocks: altCurrentBlocks, operator: operator}
@@ -174,7 +174,7 @@ export function main() {
         if(eBlock.id !== block.id && eBlock.parentId !== block.parentId){ // we only want to check the blocks that are not in the big block
            //if the blocks has same x-coor
           if(block.x === eBlock.x && findRightEdgePos(block) === findRightEdgePos(block)){
-            //and if current block's y-coor is within the range of other block
+            //and if current block's y-coor is within aathe range of other block
             if(block.y > findTopEdgePos(eBlock)){
               return false
             }
@@ -298,9 +298,8 @@ export function main() {
   const shiftBlockAfterClear = (blocks: Block[], indexRow: number | null) => {
     if(indexRow){
       const newBlocks = blocks.map(block => {
-        const multiplier = ((Constants.GRID_HEIGHT - 1) - indexRow) + 1
         if(indexRow && block.y < indexRow * CBlock.HEIGHT){
-          return createBlock(block, {y: block.y + CBlock.HEIGHT * multiplier})
+          return createBlock(block, {y: block.y + CBlock.HEIGHT})
         }
         return block
       })
@@ -380,6 +379,16 @@ export function main() {
     return preRotatedBlocks 
   }
 
+  const spawnRandomBlocks = (s: State) => {
+    const creationBlocks = [create22square,tBlock,skewBlock,straightBlock]
+    const randomIndex = Math.floor(Math.random() * creationBlocks.length)
+    const blocks = creationBlocks[randomIndex](s)
+
+    return tick(s,{blocks: [...s.blocks,...blocks], 
+      blockCount: s.blockCount + blocks.length, 
+      bigBlockCount: s.bigBlockCount + 1})
+  }
+
   const source$: Subscription = merge(tickWithX$,left$,right$,down$,rotate$).pipe(
       scan((s:State,value) => {
         //take out the block that has not been placed yet (the player still can move these blocks)
@@ -389,12 +398,7 @@ export function main() {
 
         //if the current game state does not have any blocks that is not placed, we would like to create some new ones
         if(!currentBlocks.length){
-          // const block = create22square(s)
-          const block = tBlock(s)
-          // const block = skewBlock(s)
-          return tick(s,{blocks: [...s.blocks,...block], 
-            blockCount: s.blockCount + block.length, 
-            bigBlockCount: s.bigBlockCount + 1})
+          return spawnRandomBlocks(s)
         }
 
         //pre-move the blocks
