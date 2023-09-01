@@ -12,7 +12,7 @@ const initialState: State = {
     nextShape: null,
     level: 0,
     highScore: 0,
-    timeDropBedRock: 0,
+    timeDropBedRock: 5,
     bedRocks: [],
     tickets: 1,
     clearRowTimes: 0,

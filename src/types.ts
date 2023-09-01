@@ -86,7 +86,7 @@ type KArgumentBlock<T extends BlockProperty> = {
 
 type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
 
-type MouseClick = "restartClick" | "ticketClick";
+type MouseClick = "restartClick";
 
 type EventType = KeyPressValue | MouseClick;
 
