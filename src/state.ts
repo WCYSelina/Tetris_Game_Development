@@ -13,10 +13,6 @@ const initialState: State = {
     level: 0,
     highScore: 0,
     timeDropBedRock: 5,
-    bedRocks: [],
-    tickets: 1,
-    clearRowTimes: 0,
-    choosingBedRock: false,
   } as const;
 
 /**

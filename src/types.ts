@@ -13,6 +13,11 @@ const Constants = {
   GRID_WIDTH: 10,
   GRID_HEIGHT: 20,
   DOWN_SPEED: 10,
+  DROP_BED_ROCK: 8,
+  CLEAR_ROW_SCORE: 100,
+  DROP_BLOCK_SCORE: 10,
+  LEVEL_UP_SCORE: 1000,
+  MAX_LEVEL: 10
 } as const;
 
 /**
@@ -59,10 +64,6 @@ type State = Readonly<{
   level: number
   highScore: number
   timeDropBedRock: number
-  bedRocks: ReadonlyArray<Block>,
-  tickets: number,
-  clearRowTimes: number,
-  choosingBedRock: boolean,
 }>;
 
 const CBlock = {
