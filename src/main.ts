@@ -32,6 +32,8 @@ import {
   KeyPressValue,
   Rows,
   CBlock,
+  MouseClick,
+  EventType,
 } from "./types";
 import {
   initialState,
@@ -41,7 +43,7 @@ import {
   tBlock,
   straightBlock,
   skewBlock,
-  createBlackBlock,
+  createGreyBlock,
 } from "./state";
 import { findRightEdgePos, findTopEdgePos, reduceUtil } from "./utils";
 /** Rendering (side effects) */
@@ -99,6 +101,8 @@ export function main() {
     HTMLElement;
   const instantReplay = document.querySelector("#instantReplay") as HTMLElement;
   const container = document.querySelector("#main") as HTMLElement;
+  const tickets = document.querySelector("#ticket") as SVGGraphicsElement &
+  HTMLElement;
 
   svg.setAttribute("height", `${Viewport.CANVAS_HEIGHT}`);
   svg.setAttribute("width", `${Viewport.CANVAS_WIDTH}`);
@@ -109,6 +113,7 @@ export function main() {
   const levelText = document.querySelector("#levelText") as HTMLElement;
   const scoreText = document.querySelector("#scoreText") as HTMLElement;
   const highScoreText = document.querySelector("#highScoreText") as HTMLElement;
+  const ticketText = document.querySelector("#ticketText") as HTMLElement;
 
   /** User input */
 
@@ -117,18 +122,19 @@ export function main() {
   const fromKey = (keyCode: Key, x: KeyPressValue) =>
     key$.pipe(
       filter(({ code }) => code === keyCode),
-      map(() => ({
-        x: x, // map this to access "value" in the pipe
-      }))
+      map(() => x as KeyPressValue)
     );
 
   const left$ = fromKey("KeyA", "-X");
   const right$ = fromKey("KeyD", "+X");
   const down$ = fromKey("KeyS", "+Y");
   const rotate$ = fromKey("KeyW", "W");
-  const restartClick$ = fromEvent<MouseEvent>(restart, "click");
-  const instantRestartClick$ = fromEvent<MouseEvent>(instantReplay, "click");
-
+  const restartClick$ = fromEvent<MouseEvent>(restart, "click").pipe(
+    map(() => ("restartClick" as MouseClick )))
+  const instantRestartClick$ = fromEvent<MouseEvent>(instantReplay, "click").pipe(
+    map(() => ("restartClick" as MouseClick )))
+  const ticketClick$ = fromEvent<MouseEvent>(tickets, "click").pipe(
+    map(() => ("ticketClick" as MouseClick )));
   /** Observables */
 
   /** Determines the rate of time steps */
@@ -147,6 +153,7 @@ export function main() {
     levelText.textContent = `${s.level}`
     scoreText.textContent = `${s.score}`
     highScoreText.textContent = `${s.highScore}`
+    ticketText.textContent = `${s.tickets}`
     const blocks = svg.querySelectorAll(".block");
     blocks.forEach((block) => {
       svg.removeChild(block);
@@ -192,8 +199,7 @@ export function main() {
 
   //in order to merge tick with the input keyboard stream, we need to map the same properties as the input keybord stream
   const tickWithX$ = tick$.pipe(
-    map(() => ({ x: "NULL" } as { x: KeyPressValue }))
-  );
+    map(() => "NULL" as KeyPressValue));
 
   const moveBlock = (
     s: State,
@@ -212,7 +218,7 @@ export function main() {
       };
       //only change the x-coor when the key left and right is pressed
       const x =
-        operator === "+X" || operator === "-X"
+        (operator === "+X" || operator === "-X") && currentBlock.type !== "bedrock"
           ? findX(operator)
           : currentBlock.x;
       const altBlock = createBlock(currentBlock, {
@@ -374,7 +380,9 @@ export function main() {
               allRows: new Array(Constants.GRID_HEIGHT)
                 .fill(false)
                 .map(() => new Array(Constants.GRID_WIDTH).fill(false)),
-              score: s.score + 100
+              score: s.score + 100,
+              clearRowTimes: s.clearRowTimes + 1,
+              tickets: Math.floor((s.clearRowTimes + 1)/3)
             });
           } else {
             return tick(s, {
@@ -382,7 +390,9 @@ export function main() {
               allRows: new Array(Constants.GRID_HEIGHT)
                 .fill(false)
                 .map(() => new Array(Constants.GRID_WIDTH).fill(false)),
-              score: s.score + 100
+              score: s.score + 100,
+              clearRowTimes: s.clearRowTimes + 1,
+              tickets: Math.floor((s.clearRowTimes + 1)/3)
             });
           }
         }
@@ -486,6 +496,18 @@ export function main() {
     return preRotatedBlocks;
   };
 
+  const turnBlocksWhite = (s: State) => {
+    console.log("sss")
+    const whiteBlocks = s.blocks.map(block => {
+      if(block.type !== "bedrock"){
+        return createBlock(block, {style: "fill: white"})
+      }
+      return block
+    })
+    return tick(s, {blocks: whiteBlocks, choosingBedRock: true})
+  }
+
+
   const spawnRandomBlocks = (s: State) => {
     const creationBlocks = [create22square, tBlock, skewBlock, straightBlock];
     const randomIndex = Math.floor(Math.random() * creationBlocks.length);
@@ -507,134 +529,165 @@ export function main() {
     down$,
     rotate$,
     restartClick$,
-    instantRestartClick$
+    instantRestartClick$,
+    ticketClick$
   )
     .pipe(
-      scan((s: State, value) => {
-        if(Math.floor(s.score/1000) <= 10){
-          s = tick(s, {level: Math.floor(s.score/1000)})
+      scan<EventType, State>((s: State, value: EventType) => {
+        if(s.choosingBedRock){
+          return s
         }
-        if (s.blackBlockCount !== (s.level - 1) * Constants.GRID_WIDTH) {
-          const rowBlackBlock = createRange(1, s.level - 1);
-          const columnBlackBlock = createRange(0, Constants.GRID_WIDTH - 1);
-
-          const blackBlocks = rowBlackBlock.map((row) => {
-            const blackBlock = columnBlackBlock.map((column) => {
-              const blackBlock = createBlackBlock(
-                s,
-                column * CBlock.WIDTH,
-                (Constants.GRID_HEIGHT - row) * CBlock.HEIGHT
-              );
-              return blackBlock;
-            });
-            return blackBlock;
-          });
-          if (blackBlocks.length) {
-            const state = blackBlocks.reduce((acc, blocks) => {
-              return blocks.reduce((acc, block) => {
-                return tick(acc, {
-                  blocks: [...acc.blocks, block],
-                  blackBlockCount: acc.blackBlockCount + 1,
-                });
-              }, acc);
-            }, s);
-            s = state;
-          }
-        }
-
-        if (!s.gameEnd) {
-          if (!s.nextShape) {
-            return spawnRandomBlocks(s);
-          }
-
-          //take out the block that has not been placed yet (the player still can move these blocks)
-          const currentBlocks = s.blocks.filter((block) => !block.placed);
-          //take out the block that has been placed (the player can't move these blocks anymore)
-          const previousBlock = s.blocks.filter((block) => block.placed);
-
-          //if the current game state does not have any blocks that is not placed, we would like to create some new ones
-          if (!currentBlocks.length) {
-            if (s.nextShape) {
-              return tick(s, {
-                blocks: [...s.blocks, ...s.nextShape],
-                blockCount: s.blockCount + s.nextShape.length,
-                bigBlockCount: s.bigBlockCount + 1,
-                nextShape: null,
-              });
+        else{
+          if (value && value === "restartClick") {
+            if(s.score > s.highScore){
+              return tick(initialState, {highScore: s.score}); // Reset state on mouse click
             }
+            return initialState
           }
-
-          //since mouseClick$ does not have x value, we need to handle this situation
-          if (value instanceof MouseEvent) {
-            return initialState; // Reset state on mouse click
+          else if(value && value === "ticketClick"){
+  
+            return turnBlocksWhite(s)
           }
-          //pre-move the blocks
-          const moveCurrentBlock = moveBlock(s, currentBlocks, value.x);
-          //first check if x-coor can be updated successfully
-          //the only check if y-coor can be updated successfully
-
-          //if it cant be updated successfully
-          if (!checkLeftRight(s, moveCurrentBlock.blocks)) {
-            //we copy the pre-moved blocks and change their x-coor to original coor
-            const newMovedCurrentBlock = moveCurrentBlock.blocks.map(
-              (block, index) => {
-                return createBlock(block, { x: currentBlocks[index].x });
-              }
-            );
-            //then check if y-coor can be updated successfully
-            //and update the state
-            const validMove = checkYValid(newMovedCurrentBlock, s);
-            s = stateMoveHandling(
-              s,
-              validMove,
-              newMovedCurrentBlock,
-              currentBlocks,
-              previousBlock
-            );
-          } else {
-            //this means that x-coor is updated successfully
-            const validMove = checkYValid(moveCurrentBlock.blocks, s);
-            s = stateMoveHandling(
-              s,
-              validMove,
-              moveCurrentBlock.blocks,
-              currentBlocks,
-              previousBlock
-            );
-          }
-
-          const newPreviousBlock = s.blocks.filter((block) => block.placed);
-          const newCurrentBlock = s.blocks.filter((block) => !block.placed);
-
-          //pre-rotate the blocks
-          if (value.x === "W") {
-            const rotatedCurrentBlocks = preRotate(newCurrentBlock);
-            if (!rotatedCurrentBlocks.length) {
-              s = tick(s, {
-                blocks: [...newPreviousBlock, ...newCurrentBlock],
-              });
-            } else {
-              if (
-                checkLeftRight(s, rotatedCurrentBlocks) &&
-                checkYValid(rotatedCurrentBlocks, s)
-              ) {
-                s = tick(s, {
-                  blocks: [...newPreviousBlock, ...rotatedCurrentBlocks],
+          else{
+            if(Math.floor(s.score/1000) <= 10){
+              s = tick(s, {level: Math.floor(s.score/1000)})
+            }
+            if (s.blackBlockCount !== (s.level - 1) * Constants.GRID_WIDTH) {
+              const rowBlackBlock = createRange(1, s.level - 1);
+              const columnBlackBlock = createRange(0, Constants.GRID_WIDTH - 1);
+    
+              const blackBlocks = rowBlackBlock.map((row) => {
+                const blackBlock = columnBlackBlock.map((column) => {
+                  const blackBlock = createGreyBlock(
+                    s,
+                    column * CBlock.WIDTH,
+                    (Constants.GRID_HEIGHT - row) * CBlock.HEIGHT
+                  );
+                  return blackBlock;
                 });
+                return blackBlock;
+              });
+              if (blackBlocks.length) {
+                const state = blackBlocks.reduce((acc, blocks) => {
+                  return blocks.reduce((acc, block) => {
+                    return tick(acc, {
+                      blocks: [...acc.blocks, block],
+                      blackBlockCount: acc.blackBlockCount + 1,
+                    });
+                  }, acc);
+                }, s);
+                s = state;
               }
             }
+    
+            if (!s.gameEnd) {
+              if (!s.nextShape) {
+                return spawnRandomBlocks(s);
+              }
+    
+              //take out the block that has not been placed yet (the player still can move these blocks)
+              const currentBlocks = s.blocks.filter((block) => !block.placed);
+              //take out the block that has been placed (the player can't move these blocks anymore)
+              const previousBlock = s.blocks.filter((block) => block.placed);
+    
+              //if the current game state does not have any blocks that is not placed, we would like to create some new ones
+              if (!currentBlocks.length) {
+                if(s.timeDropBedRock === 0){
+                  const bedRock: Block = {
+                    id: -1,
+                    parentId:"null",
+                    x: Math.floor(Math.random() * Constants.GRID_WIDTH) * CBlock.WIDTH,
+                    y: 0,
+                    width: CBlock.WIDTH,
+                    height: CBlock.HEIGHT,
+                    placed: false,
+                    style: "fill: black",
+                    class: "block",
+                    type: "bedrock"
+                  }
+                  return tick(s, {blocks: [...s.blocks, bedRock], timeDropBedRock: 5})
+                }
+                else{
+                  s = tick(s, {timeDropBedRock: s.timeDropBedRock - 1})
+                }
+                if (s.nextShape) {
+                  return tick(s, {
+                    blocks: [...s.blocks, ...s.nextShape],
+                    blockCount: s.blockCount + s.nextShape.length,
+                    bigBlockCount: s.bigBlockCount + 1,
+                    nextShape: null,
+                  });
+                }
+              }
+    
+              // //since mouseClick$ does not have x value, we need to handle this situation
+              // if (value instanceof MouseEvent) {
+              //   return initialState; // Reset state on mouse click
+              // }
+              //pre-move the blocks
+              const moveCurrentBlock = moveBlock(s, currentBlocks, value);
+              //first check if x-coor can be updated successfully
+              //the only check if y-coor can be updated successfully
+    
+              //if it cant be updated successfully
+              if (!checkLeftRight(s, moveCurrentBlock.blocks)) {
+                //we copy the pre-moved blocks and change their x-coor to original coor
+                const newMovedCurrentBlock = moveCurrentBlock.blocks.map(
+                  (block, index) => {
+                    return createBlock(block, { x: currentBlocks[index].x });
+                  }
+                );
+                //then check if y-coor can be updated successfully
+                //and update the state
+                const validMove = checkYValid(newMovedCurrentBlock, s);
+                s = stateMoveHandling(
+                  s,
+                  validMove,
+                  newMovedCurrentBlock,
+                  currentBlocks,
+                  previousBlock
+                );
+              } else {
+                //this means that x-coor is updated successfully
+                const validMove = checkYValid(moveCurrentBlock.blocks, s);
+                s = stateMoveHandling(
+                  s,
+                  validMove,
+                  moveCurrentBlock.blocks,
+                  currentBlocks,
+                  previousBlock
+                );
+              }
+    
+              const newPreviousBlock = s.blocks.filter((block) => block.placed);
+              const newCurrentBlock = s.blocks.filter((block) => !block.placed);
+    
+              //pre-rotate the blocks
+              if (value === "W") {
+                const rotatedCurrentBlocks = preRotate(newCurrentBlock);
+                if (!rotatedCurrentBlocks.length) {
+                  s = tick(s, {
+                    blocks: [...newPreviousBlock, ...newCurrentBlock],
+                  });
+                } else {
+                  if (
+                    checkLeftRight(s, rotatedCurrentBlocks) &&
+                    checkYValid(rotatedCurrentBlocks, s)
+                  ) {
+                    s = tick(s, {
+                      blocks: [...newPreviousBlock, ...rotatedCurrentBlocks],
+                    });
+                  }
+                }
+              }
+              s = addBlockRowForClear(s);
+              const rowToClear = checkFullRows(s.allRows);
+              s = clearRow(s, rowToClear);
+            }
+            return s;
           }
-          s = addBlockRowForClear(s);
-          const rowToClear = checkFullRows(s.allRows);
-          s = clearRow(s, rowToClear);
+
         }
-        if (value instanceof MouseEvent) {
-          if(s.score > s.highScore){
-            return tick(initialState, {highScore: s.score}); // Reset state on mouse click
-          }
-          return initialState
-        }
-        return s;
       }, initialState)
     )
     .subscribe((s: State) => {

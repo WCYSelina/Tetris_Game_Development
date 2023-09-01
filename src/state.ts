@@ -1,4 +1,4 @@
-export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock, createBlackBlock}
+export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock, createGreyBlock}
 import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block, CBlock} from './types'
 
 const initialState: State = {
@@ -11,11 +11,16 @@ const initialState: State = {
     allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false)),
     nextShape: null,
     level: 0,
-    highScore: 0
+    highScore: 0,
+    timeDropBedRock: 0,
+    bedRocks: [],
+    tickets: 1,
+    clearRowTimes: 0,
+    choosingBedRock: false,
   } as const;
 
 /**
- * Updates the state by proceeding with one time step.
+ * Updates the state by proceeasssaaaaading with one time step.
  *
  * @param s Current state
  * @param k 
@@ -52,12 +57,12 @@ const createInitialBlock = (s:State, colour: String, x: number, y: number, id: n
     placed: false,
     style: `fill: ${colour}`,
     class: "block",
-    type: `${type}`
+    type: `${type}`,
   }
   return block
 }
 
-const createBlackBlock = (s: State, x:number, y:number) => {
+const createGreyBlock = (s: State, x:number, y:number) => {
   return{
     id: -1,
     parentId:"null",

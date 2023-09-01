@@ -36,6 +36,23 @@
         <div>
           <button id="instantReplay">Click To Replay</button>
         </div>
+        <svg id="ticket" width="55" height="25">
+          <!-- Cash rectangle -->
+          <rect x="0" y="0" width="55" height="25" fill="#87CEEB" stroke="black" />
+          
+          <!-- Black icon -->
+          <rect x="20.5" y="5" width="15" height="15" fill="black" />
+          
+          <!-- Cross lines on the icon -->
+          <line x1="19.5" y1="4.5" x2="37.5" y2="20.5" stroke="red" />
+          <line x1="19.5" y1="19.5" x2="37.5" y2="4.5" stroke="red" />
+        </svg>
+
+        <div class="text">
+          <span class="left">Ticket: </span>
+          <span class="right">/5</span>
+          <span class="right" id="ticketText">...</span>
+        </div>
         
       </div>
     </main>

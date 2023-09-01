@@ -1,5 +1,5 @@
 export { Constants, Viewport, CBlock}
-export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows}
+export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows, MouseClick, EventType}
 /** Constants */
 const Viewport = {
   CANVAS_WIDTH: 200,
@@ -55,9 +55,14 @@ type State = Readonly<{
   blockCount: number;
   blackBlockCount: number
   allRows: ReadonlyArray<ReadonlyArray<boolean>>;
-  nextShape: Block[] | null;
+  nextShape: ReadonlyArray<Block>| null;
   level: number
   highScore: number
+  timeDropBedRock: number
+  bedRocks: ReadonlyArray<Block>,
+  tickets: number,
+  clearRowTimes: number,
+  choosingBedRock: boolean,
 }>;
 
 const CBlock = {
@@ -80,6 +85,10 @@ type KArgumentBlock<T extends BlockProperty> = {
 }
 
 type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
+
+type MouseClick = "restartClick" | "ticketClick";
+
+type EventType = KeyPressValue | MouseClick;
 
 // type AllRowsProperty = keyof AllRows
 // type AllRowsPropertyValue<T extends AllRowsProperty> = AllRows[T]
