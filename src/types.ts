@@ -22,7 +22,7 @@ const Constants = {
 } as const;
 
 /**
- * ObjectIds help us identify objects and manage objects which timeout (such as bullets)
+ * ObjectIds help us identify objects and manage objects which timeout
  */
 type ObjectId = Readonly<{ id: number, parentId: String}>
 
@@ -59,7 +59,7 @@ type State = Readonly<{
   blocks: ReadonlyArray<Block>;
   bigBlockCount: number;
   blockCount: number;
-  blackBlockCount: number
+  greyBlockCount: number
   allRows: ReadonlyArray<ReadonlyArray<boolean>>;
   nextShape: ReadonlyArray<Block>| null;
   level: number
@@ -86,23 +86,17 @@ type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
 
-// type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
 type KeyPressValue = Readonly<{
   direction: string
 }>
 
-// type MouseClick = "restartClick";
 type MouseClick = Readonly<{
   clickEvent: string
 }>;
 
-// type RandomNumber = number
 type RandomNumber = Readonly<{
   randomValue : number
 }>
 
+// to merge different observables
 type EventType = KeyPressValue | MouseClick | RandomNumber;
-
-// type AllRowsProperty = keyof AllRows
-// type AllRowsPropertyValue<T extends AllRowsProperty> = AllRows[T]
-// type 

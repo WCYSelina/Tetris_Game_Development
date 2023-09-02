@@ -7,16 +7,16 @@ const initialState: State = {
     blocks: [],
     bigBlockCount: 0,
     blockCount: 0,
-    blackBlockCount: 0,
+    greyBlockCount: 0,
     allRows: new Array(Constants.GRID_HEIGHT).fill(false).map(() => new Array(Constants.GRID_WIDTH).fill(false)),
     nextShape: null,
     level: 0,
     highScore: 0,
-    timeDropBedRock: 5,
+    timeDropBedRock: 8,
   } as const;
 
 /**
- * Updates the state by proceeasssaaaaading with one time step.
+ * Updates the state by proceeding with one time step.
  *
  * @param s Current state
  * @param k 
@@ -72,6 +72,10 @@ const createGreyBlock = (s: State, x:number, y:number) => {
     type: "null"
   }
 }
+
+/*****************************/
+//all types of block creation//
+
 
 const create22square = (s:State): Block[] => {
   const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "square") 
@@ -135,5 +139,3 @@ const skewZBlock = (s: State): Block[] => {
 
   return [block1, block2, block3, block4]
 }
-
-
