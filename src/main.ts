@@ -307,7 +307,15 @@ const clearRow = (s: State, indexRow: (number | null)[] | null) => {
               .map(() => new Array(Constants.GRID_WIDTH).fill(false)),
             score: s.score + Constants.CLEAR_ROW_SCORE,
           });
-        } 
+        } else {
+          return tick(s, {
+            blocks: clearBlocks,
+            allRows: new Array(Constants.GRID_HEIGHT)
+              .fill(false)
+              .map(() => new Array(Constants.GRID_WIDTH).fill(false)),
+            score: s.score + Constants.CLEAR_ROW_SCORE,
+          });
+        }
       }
       return accS;
     }, s);
@@ -324,9 +332,11 @@ const clearRow = (s: State, indexRow: (number | null)[] | null) => {
  */
 const shiftBlockAfterClear = (blocks: Block[], indexRow: number | null) => {
   if (indexRow) {
-    // shift block by increament the y
     const newBlocks = blocks.map((block) => {
-      return createBlock(block, { y: block.y + CBlock.HEIGHT });
+      if (indexRow && block.y < indexRow * CBlock.HEIGHT) {
+        return createBlock(block, { y: block.y + CBlock.HEIGHT });
+      }
+      return block;
     });
     return newBlocks;
   }
