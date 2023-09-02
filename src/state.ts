@@ -1,4 +1,4 @@
-export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewBlock, createGreyBlock}
+export{ initialState, tick, createBlock, create22square, createInitialBlock, tBlock, straightBlock, skewSBlock, createGreyBlock, jBlock, lBlock, skewZBlock}
 import {State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, Viewport, Constants, Block, CBlock} from './types'
 
 const initialState: State = {
@@ -92,20 +92,48 @@ const tBlock = (s: State): Block[] => {
 }
 
 const straightBlock = (s: State): Block[] => {
-  const block1 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "straight") 
-  const block2 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH,0, s.blockCount + 2, "straight")
-  const block3 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3, "straight")
-  const block4 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH * 2,0, s.blockCount + 4, "straight")
+  const block1 = createInitialBlock(s,"skyblue",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "straight") 
+  const block2 = createInitialBlock(s,"skyblue",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH,0, s.blockCount + 2, "straight")
+  const block3 = createInitialBlock(s,"skyblue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3, "straight")
+  const block4 = createInitialBlock(s,"skyblue",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH * 2,0, s.blockCount + 4, "straight")
 
   return [block1, block2, block3, block4]
 }
 
-const skewBlock = (s: State): Block[] => {
-  const block1 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "skew") 
-  const block2 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2,CBlock.HEIGHT, s.blockCount + 2, "skew")
-  const block3 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3, "skew")
-  const block4 = createInitialBlock(s,"yellow",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, CBlock.HEIGHT, s.blockCount + 4, "skew")
+const skewSBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"green",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "skew") 
+  const block2 = createInitialBlock(s,"green",Viewport.CANVAS_WIDTH/2,CBlock.HEIGHT, s.blockCount + 2, "skew")
+  const block3 = createInitialBlock(s,"green",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, 0, s.blockCount + 3, "skew")
+  const block4 = createInitialBlock(s,"green",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, CBlock.HEIGHT, s.blockCount + 4, "skew")
 
   return [block1, block2, block3, block4]
 }
+
+const jBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2, 0, s.blockCount + 1, "J")
+  const block2 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2, CBlock.HEIGHT, s.blockCount + 2, "J")
+  const block3 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2, CBlock.WIDTH*2, s.blockCount + 3, "J")
+  const block4 = createInitialBlock(s,"blue",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, CBlock.HEIGHT*2 , s.blockCount + 4, "J")
+
+  return [block3, block1, block2, block4]
+}
+
+const lBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"orange",Viewport.CANVAS_WIDTH/2, 0, s.blockCount + 1, "L")
+  const block2 = createInitialBlock(s,"orange",Viewport.CANVAS_WIDTH/2, CBlock.HEIGHT, s.blockCount + 2, "L")
+  const block3 = createInitialBlock(s,"orange",Viewport.CANVAS_WIDTH/2, CBlock.WIDTH*2, s.blockCount + 3, "L")
+  const block4 = createInitialBlock(s,"orange",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, CBlock.HEIGHT*2 , s.blockCount + 4, "L")
+
+  return [block3, block1, block2, block4]
+}
+
+const skewZBlock = (s: State): Block[] => {
+  const block1 = createInitialBlock(s,"red",Viewport.CANVAS_WIDTH/2,0, s.blockCount + 1, "skew") 
+  const block2 = createInitialBlock(s,"red",Viewport.CANVAS_WIDTH/2,CBlock.HEIGHT, s.blockCount + 2, "skew")
+  const block3 = createInitialBlock(s,"red",Viewport.CANVAS_WIDTH/2 - CBlock.WIDTH, 0, s.blockCount + 3, "skew")
+  const block4 = createInitialBlock(s,"red",Viewport.CANVAS_WIDTH/2 + CBlock.WIDTH, CBlock.HEIGHT, s.blockCount + 4, "skew")
+
+  return [block1, block2, block3, block4]
+}
+
 

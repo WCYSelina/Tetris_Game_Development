@@ -1,5 +1,5 @@
 export { Constants, Viewport, CBlock}
-export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows, MouseClick, EventType}
+export type { ObjectId, Block, Key, Event, State, KArgumentState, KArgumentBlock, StateProperty, BlockProperty, KeyPressValue, Rows, MouseClick, EventType, RandomNumber}
 /** Constants */
 const Viewport = {
   CANVAS_WIDTH: 200,
@@ -17,7 +17,8 @@ const Constants = {
   CLEAR_ROW_SCORE: 100,
   DROP_BLOCK_SCORE: 10,
   LEVEL_UP_SCORE: 1000,
-  MAX_LEVEL: 10
+  MAX_LEVEL: 10,
+  NUM_BLOCK_TYPES: 7
 } as const;
 
 /**
@@ -85,11 +86,22 @@ type KArgumentBlock<T extends BlockProperty> = {
   [key: string]: BlockPropertyValue<T>
 }
 
-type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
+// type KeyPressValue = "+X" | "-X" | "+Y" | "W" | "NULL"
+type KeyPressValue = Readonly<{
+  direction: string
+}>
 
-type MouseClick = "restartClick";
+// type MouseClick = "restartClick";
+type MouseClick = Readonly<{
+  clickEvent: string
+}>;
 
-type EventType = KeyPressValue | MouseClick;
+// type RandomNumber = number
+type RandomNumber = Readonly<{
+  randomValue : number
+}>
+
+type EventType = KeyPressValue | MouseClick | RandomNumber;
 
 // type AllRowsProperty = keyof AllRows
 // type AllRowsPropertyValue<T extends AllRowsProperty> = AllRows[T]

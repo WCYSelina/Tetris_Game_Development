@@ -13,10 +13,10 @@
  */
 
 import "./style.css";
-import { fromEvent, interval, merge } from "rxjs";
+import { fromEvent, interval, merge, Observable} from "rxjs";
 import { map, filter, scan } from "rxjs/operators";
-import { Block, Key, State, Viewport, Constants, KeyPressValue, Rows, CBlock, MouseClick, EventType } from "./types";
-import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewBlock, createGreyBlock } from "./state";
+import { Block, Key, State, Viewport, Constants, KeyPressValue, Rows, CBlock, MouseClick, EventType, RandomNumber } from "./types";
+import { initialState, tick, createBlock, create22square, tBlock, straightBlock, skewSBlock, createGreyBlock, jBlock, lBlock, skewZBlock} from "./state";
 /** Rendering (side effects) */
 
 /**
@@ -72,8 +72,8 @@ const moveBlockX = (
     };
     //only change the x-coor when the key left and right is pressed
     const x =
-      (operator === "+X" || operator === "-X") && currentBlock.type !== "bedrock"
-        ? findX(operator)
+      (operator.direction === "+X" || operator.direction === "-X") && currentBlock.type !== "bedrock"
+        ? findX(operator.direction)
         : currentBlock.x;
     const altBlock = createBlock(currentBlock, {
       x: x,
@@ -125,13 +125,11 @@ const checkLeftRight = (s: State, blocks: Block[]): boolean => {
       // we only want to check the blocks that are not in the big block
       if (eBlock.id !== block.id && eBlock.parentId !== block.parentId) {
         //if the blocks has same x-coor
-        if (block.x === eBlock.x) {
+        if (block.x === eBlock.x && eBlock.y === block.y) {
           //and if current block's y-coor is within the range of other block
           // if (block.y > findTopEdgePos(eBlock) && block.y <= eBlock.y ) {
-            if(eBlock.y === block.y){
-            //it is not able to move, hence return false
-            return false;
-          }
+          //it is not able to move, hence return false
+          return false;
         }
         return reachBoundaryX();
       }
@@ -157,8 +155,8 @@ const stateMoveHandling = (
     if (validMove) {
       return tick(s, { blocks: [...previousBlock, ...blocks] });
     } else {
-      const placedAllBlock = currentBlocks.map((block) => {
-        return createBlock(block, { placed: true });
+      const placedAllBlock = blocks.map((block,index) => {
+        return createBlock(block, {placed: true, y: currentBlocks[index].y});
       });
       s = tick(s, { blocks: [...previousBlock, ...placedAllBlock], score: s.score + Constants.DROP_BLOCK_SCORE});
       const placedBlock = s.blocks.filter((block) => block.placed);
@@ -339,9 +337,11 @@ const preRotate = (blocks: Block[]) => {
   return preRotatedBlocks;
 };
 
-const spawnRandomBlocks = (s: State) => {
-  const creationBlocks = [create22square, tBlock, skewBlock, straightBlock];
-  const randomIndex = Math.floor(Math.random() * creationBlocks.length);
+const spawnRandomBlocks = (s: State, randomIndex: number) => {
+  const creationBlocks = [create22square, tBlock, skewSBlock, straightBlock, jBlock, lBlock, skewZBlock];
+  if(randomIndex === -1){
+    return s
+  }
   const blocks = creationBlocks[randomIndex](s);
 
   return tick(s, { nextShape: blocks });
@@ -400,7 +400,7 @@ const currentBlockCreation = (s: State, currentBlocks: Block[]) => {
       class: "bedrock",
       type: "bedrock"
     }
-    return tick(s, {blocks: [...s.blocks, bedRock], timeDropBedRock: Constants.DROP_BED_ROCK})
+    return tick(s, {blocks: [...s.blocks, bedRock], timeDropBedRock: Constants.DROP_BED_ROCK, blockCount: s.blockCount + 1})
   }
   else{
     s = tick(s, {timeDropBedRock: s.timeDropBedRock - 1})
@@ -440,6 +440,41 @@ const rotationHandling = (s: State, value: string) => {
   return s
 }
 
+abstract class RNG {
+  // LCG using GCC's constants
+  private static m = 0x80000000; // 2**31
+  private static a = 1103515245;
+  private static c = 12345;
+
+  /**
+   * Call `hash` repeatedly to generate the sequence of hashes.
+   * @param seed
+   * @returns a hash of the seed
+   */
+  public static hash = (seed: number) => (RNG.a * seed + RNG.c) % RNG.m;
+
+  /**
+   * Takes hash value and scales it to the range [-1, 1]
+   */
+  public static scale = (hash: number) => {
+    const scaled = (hash / RNG.m) * Constants.NUM_BLOCK_TYPES + 1; // Scale to [0, 8]
+    const returnNumber = Math.floor(scaled); // Convert to [0, 7]};
+    return returnNumber
+  }
+}
+
+function createRngStreamFromSource<T>(source$: Observable<T>) {
+  return function createRngStream(
+    seed: number = 0
+  ): Observable<number> {
+    const randomNumberStream = source$.pipe(
+      scan((previousSeed) => RNG.hash(previousSeed), seed),
+      map((hash) => RNG.scale(hash)),
+    );
+    return randomNumberStream;
+  };
+}
+
 /**
  * This is the function called on page load. Your main game loop
  * should be called here.
@@ -451,8 +486,6 @@ export function main() {
   const preview = document.querySelector("#svgPreview") as SVGGraphicsElement &
     HTMLElement;
   const gameover = document.querySelector("#gameOver") as SVGGraphicsElement &
-    HTMLElement;
-  const restart = document.querySelector("#restart") as SVGGraphicsElement &
     HTMLElement;
   const instantReplay = document.querySelector("#instantReplay") as HTMLElement;
   const container = document.querySelector("#main") as HTMLElement;
@@ -477,19 +510,20 @@ export function main() {
       map(() => x as KeyPressValue)
     );
 
-  const left$ = fromKey("KeyA", "-X");
-  const right$ = fromKey("KeyD", "+X");
-  const down$ = fromKey("KeyS", "+Y");
-  const rotate$ = fromKey("KeyW", "W");
-  const restartClick$ = fromEvent<MouseEvent>(restart, "click").pipe(
-    map(() => ("restartClick" as MouseClick )))
+  const left$ = fromKey("KeyA", {direction: "-X"});
+  const right$ = fromKey("KeyD", {direction: "+X"});
+  const down$ = fromKey("KeyS", {direction: "+Y"});
+  const rotate$ = fromKey("KeyW", {direction: "W"});
   const instantRestartClick$ = fromEvent<MouseEvent>(instantReplay, "click").pipe(
-    map(() => ("restartClick" as MouseClick )))
+    map(() => ({clickEvent: "restartClick"} )))
+
   /** Observables */
 
   /** Determines the rate of time steps */
   const tick$ = interval(Constants.TICK_RATE_MS);
 
+  const randomNumber$ = createRngStreamFromSource(interval(7))(3).pipe(
+    map((value) => {return {randomValue: value} as RandomNumber} ))
   /**
    * Renders the current state to the canvas.
    *
@@ -552,7 +586,7 @@ export function main() {
 
   //in order to merge tick with the input keyboard stream, we need to map the same properties as the input keybord stream
   const tickWithX$ = tick$.pipe(
-    map(() => "NULL" as KeyPressValue));
+    map(() => {return {direction:  "NULL"} as KeyPressValue}));
 
   const source$ = merge(
     tickWithX$,
@@ -560,28 +594,34 @@ export function main() {
     right$,
     down$,
     rotate$,
-    restartClick$,
     instantRestartClick$,
+    randomNumber$
   )
-  .pipe(
+  const rngStream = createRngStreamFromSource(source$);
+  source$.pipe(
     scan<EventType, State>((s: State, value: EventType) => {
-      if (value && value === "restartClick") {
+      if (value && "clickEvent" in value && value.clickEvent === "restartClick") {
         if(s.score > s.highScore){
           return tick(initialState, {highScore: s.score}); // Reset state on mouse click
         }
         return initialState
       }
-      else{
-        if(Math.floor(s.score/Constants.LEVEL_UP_SCORE) <= Constants.MAX_LEVEL){
-          s = tick(s, {level: Math.floor(s.score/Constants.LEVEL_UP_SCORE)})
+      else if(value && "randomValue" in value && value.randomValue){
+        if (!s.nextShape) {
+          return spawnRandomBlocks(s,value.randomValue - 1)
+          return s
+        }
+        return s
+      }
+      else if(value && "direction" in value && value.direction){
+        if(Math.floor(s.score/Constants.LEVEL_UP_SCORE) + 1 <= Constants.MAX_LEVEL){
+          s = tick(s, {level: Math.floor(s.score/Constants.LEVEL_UP_SCORE) + 1})
         }
 
         s = levelUp(s)
     
         if (!s.gameEnd) {
-          if (!s.nextShape) {
-            return spawnRandomBlocks(s);
-          }
+          
 
           //take out the block that has not been placed yet (the player still can move these blocks)
           const currentBlocks = s.blocks.filter((block) => !block.placed);
@@ -597,23 +637,24 @@ export function main() {
           //the only check if y-coor can be updated successfully
 
           s = stateMoveHandling(s, currentBlocks, moveCurrentBlock);
-          s = rotationHandling(s, value)
+          s = rotationHandling(s, value.direction)
           s = addBlockRowForClear(s);
           const rowToClear = checkFullRows(s.allRows);
           s = clearRow(s, rowToClear);
         }
+        // console.log(s)
         return s;
       }
+      // console.log(s)
+      return s;
     }, initialState)
   )
     .subscribe((s: State) => {
       render(s);
       if (s.gameEnd) {
         show(gameover);
-        show(restart);
       } else {
         hide(gameover);
-        hide(restart);
       }
     });
 }
