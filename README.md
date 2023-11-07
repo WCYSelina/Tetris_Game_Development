@@ -1,3 +1,6 @@
+## GamePlay
+![2023-11-07 19-54-00 (1)](https://github.com/WCYSelina/Tetris_Game_Development/assets/95896839/0d3f129d-bb72-414c-ae9a-58df3f0e29d7)
+
 ## Project Details
 **Objective**: 
 - Developed a classic Tetris game, utilizing functional programming principles within the TypeScript language for a maintainable and scalable codebase.
