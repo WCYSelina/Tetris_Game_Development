@@ -1,4 +1,25 @@
-# Assignment 1
+## Project Details
+**Objective**: 
+- Developed a classic Tetris game, utilizing functional programming principles within the TypeScript language for a maintainable and scalable codebase.
+
+**Core Logic**: 
+- Implemented the game's core mechanics, including tetromino generation, collision detection, line clearing, and scoring system. Ensured that the game logic adheres strictly to the functional programming paradigm, with a focus on pure functions and immutable data.
+
+**Keyboard Interaction:**
+- Managed keyboard interactions through a reactive programming model using Observables.
+- Set up listeners for specific keypress events to allow real-time game control without polling or manual event loop handling.
+- Enabled a non-blocking game loop that reacts to user inputs asynchronously, ensuring a responsive gaming experience.
+
+**Controls:**
+- W: Rotate the current tetromino.
+- A: Move the current tetromino left.
+- S: Accelerate the descent of the current tetromino.
+- D: Move the current tetromino right.
+
+**Tetromino Movement:**
+- Adjusted the tetromino's coordinates in response to keypress Observables, modifying the game state in a functional manner.
+- Encapsulated movement and rotation logic within pure functions to facilitate testing and debugging.
+- Managed game state updates efficiently to minimize redraws and optimize performance.
 
 ## Usage
 
@@ -16,32 +37,6 @@ Serve up the App (and ctrl-click the URL that appears in the console)
 ```
 > npm run dev
 ```
-
-## Implementing features
-
-There are a few files you may wish to modify. The rest should **not** be modified as they are used for configuring the build.
-
-`src/main.ts`
-- Code file used as the entry point
-- Most of your game logic should go here
-- Contains main function that is called on page load
-
-`src/style.css`
-- Stylesheet
-- You may edit this if you wish
-
-`index.html`
-- Main html file
-- Contains scaffold of game window and some sample shapes
-- Feel free to add to this, but avoid changing the existing code, especially the `id` fields
-
-`test/*.test.ts`
-- If you want to add tests, these go here
-- Uses ![`vitest`](https://vitest.dev/api/)
-
-We expect the core logic of your game to be in `src/main.ts`, however, you may elect to spread your code over multiple files. In this case, please use ![TS Modules](https://www.typescriptlang.org/docs/handbook/modules.html).
-
-Avoid separating code into too many files as it makes it hard to mark. The maximum recommended code file structure would be something like
 
 ```
 src/
